@@ -12,6 +12,20 @@ env/
 # Environment variables
 .env
 
+# Database
+instance/
+*.db
+
+# Secrets
+client_secrets.json
+
+# Logs
+logs/
+*.log
+
+# Uploads
+uploads/
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -19,7 +33,3 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
-client_secrets.json
-instance/
-*.db
-.env
