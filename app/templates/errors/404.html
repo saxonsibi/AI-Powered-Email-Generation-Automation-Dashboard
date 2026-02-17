@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found - AI Email Dashboard{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div class="text-center px-4">
+        <!-- Animated 404 Number -->
+        <div class="relative mb-8">
+            <div class="text-9xl font-bold text-gray-300 dark:text-gray-600 opacity-20">404</div>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <h1 class="text-9xl font-bold text-gray-900 dark:text-white">404</h1>
+            </div>
+        </div>
+        
+        <!-- Error Message -->
+        <h2 class="text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+            Page Not Found
+        </h2>
+        
+        <p class="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+            The page you're looking for doesn't exist or has been moved.
+        </p>
+        
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="{{ url_for('main.dashboard') }}" 
+               class="inline-flex items-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 hover:scale-105">
+                <i class="fas fa-home mr-2"></i>
+                Go to Dashboard
+            </a>
+            
+            <button onclick="history.back()" 
+                    class="inline-flex items-center px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-base font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Go Back
+            </button>
+        </div>
+        
+        <!-- Search Suggestion -->
+        <div class="mt-12 max-w-md mx-auto">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                Or try searching for what you need:
+            </p>
+            <div class="relative">
+                <input type="text" 
+                       placeholder="Search emails..." 
+                       class="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400"
+                       onkeypress="if(event.key === 'Enter') { window.location.href = '/?search=' + encodeURIComponent(this.value) }">
+                <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+            </div>
+        </div>
+        
+        <!-- Helpful Links -->
+        <div class="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">
+            <a href="{{ url_for('main.inbox') }}" 
+               class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-all duration-200 hover:scale-105 group">
+                <i class="fas fa-inbox text-2xl text-indigo-600 dark:text-indigo-400 mb-2 group-hover:scale-110 transition-transform"></i>
+                <h3 class="font-medium text-gray-900 dark:text-white">Inbox</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">View your emails</p>
+            </a>
+            
+            <a href="{{ url_for('main.compose') }}" 
+               class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-all duration-200 hover:scale-105 group">
+                <i class="fas fa-edit text-2xl text-green-600 dark:text-green-400 mb-2 group-hover:scale-110 transition-transform"></i>
+                <h3 class="font-medium text-gray-900 dark:text-white">Compose</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Write a new email</p>
+            </a>
+            
+            <a href="{{ url_for('main.settings') }}" 
+               class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-all duration-200 hover:scale-105 group">
+                <i class="fas fa-cog text-2xl text-purple-600 dark:text-purple-400 mb-2 group-hover:scale-110 transition-transform"></i>
+                <h3 class="font-medium text-gray-900 dark:text-white">Settings</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage preferences</p>
+            </a>
+            
+            <a href="{{ url_for('auth.login') }}" 
+               class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-all duration-200 hover:scale-105 group">
+                <i class="fas fa-sign-in-alt text-2xl text-blue-600 dark:text-blue-400 mb-2 group-hover:scale-110 transition-transform"></i>
+                <h3 class="font-medium text-gray-900 dark:text-white">Login</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Sign in to account</p>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // GSAP animations
+    if (typeof gsap !== 'undefined') {
+        // Animate the 404 number
+        gsap.from(".text-9xl", {
+            duration: 1,
+            scale: 0,
+            opacity: 0,
+            ease: "back.out(1.7)",
+            delay: 0.2
+        });
+        
+        // Animate the error message
+        gsap.from("h2", {
+            duration: 0.8,
+            y: 30,
+            opacity: 0,
+            ease: "power3.out",
+            delay: 0.4
+        });
+        
+        // Animate the description
+        gsap.from("p", {
+            duration: 0.8,
+            y: 20,
+            opacity: 0,
+            ease: "power3.out",
+            delay: 0.6
+        });
+        
+        // Animate the buttons
+        gsap.from(".flex-col, .grid", {
+            duration: 0.8,
+            y: 20,
+            opacity: 0,
+            stagger: 0.1,
+            ease: "power3.out",
+            delay: 0.8
+        });
+        
+        // Add floating animation to the 404
+        gsap.to(".text-9xl", {
+            duration: 3,
+            y: -10,
+            repeat: -1,
+            yoyo: true,
+            ease: "power1.inOut"
+        });
+    }
+    
+    // Easter egg: Konami code for a fun animation
+    let konamiCode = [];
+    const konamiPattern = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+    
+    document.addEventListener('keydown', function(e) {
+        konamiCode.push(e.key);
+        konamiCode = konamiCode.slice(-konamiPattern.length);
+        
+        if (konamiCode.join('') === konamiPattern.join('')) {
+            activateEasterEgg();
+        }
+    });
+    
+    function activateEasterEgg() {
+        if (typeof gsap !== 'undefined') {
+            gsap.to(".text-9xl", {
+                duration: 0.5,
+                rotation: 360,
+                scale: 1.2,
+                ease: "back.out(1.7)",
+                repeat: 3,
+                yoyo: true
+            });
+            
+            // Show a fun message
+            const message = document.createElement('div');
+            message.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-yellow-400 text-gray-900 px-6 py-3 rounded-lg shadow-lg z-50';
+            message.textContent = '🎉 You found the secret! 🎉';
+            document.body.appendChild(message);
+            
+            gsap.from(message, {
+                duration: 0.5,
+                scale: 0,
+                rotation: 180,
+                ease: "back.out(1.7)"
+            });
+            
+            setTimeout(() => {
+                gsap.to(message, {
+                    duration: 0.3,
+                    scale: 0,
+                    opacity: 0,
+                    ease: "back.in(1.7)",
+                    onComplete: () => message.remove()
+                });
+            }, 2000);
+        }
+    }
+});
+</script>
+{% endblock %}

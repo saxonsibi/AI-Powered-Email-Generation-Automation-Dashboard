@@ -1,0 +1,865 @@
+{% extends "base.html" %}
+
+{% block title %}Inbox - AI Email Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto h-screen flex flex-col">
+    <div class="flex items-center justify-between mb-6 pb-4">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Inbox</h1>
+        <div class="flex items-center space-x-4">
+            <button id="refreshBtn" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Refresh
+            </button>
+            <a href="{{ url_for('main.compose') }}" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fas fa-edit mr-2"></i>
+                Compose
+            </a>
+        </div>
+    </div>
+    
+    {% if not gmail_connected %}
+    <div class="glass rounded-xl p-6 mb-6 neumorphic">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Connect Your Gmail Account</h3>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Connect your Gmail account to view and manage your emails</p>
+            </div>
+            <a href="{{ url_for('auth.gmail_authorize') }}" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fab fa-google mr-2"></i>
+                Connect Gmail
+            </a>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Gmail-style notification banner -->
+    <div id="notification-banner" class="notification-banner hidden">
+        <div class="notification-content">
+            <div class="notification-message">
+                <i class="fas fa-envelope mr-2"></i>
+                <span id="notification-text">New email(s) received</span>
+            </div>
+            <button id="notification-close" class="notification-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Main container with sticky toolbar -->
+    <div class="glass rounded-xl overflow-hidden neumorphic flex-1 flex flex-col">
+        <!-- Sticky Toolbar -->
+        <div class="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <input type="checkbox" id="selectAll" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                    <label for="selectAll" class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">Select All</label>
+                    
+                    <button id="archiveBtn" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                        <i class="fas fa-archive mr-1"></i>
+                        Archive
+                    </button>
+                    
+                    <button id="deleteBtn" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                        <i class="fas fa-trash mr-1"></i>
+                        Delete
+                    </button>
+                    
+                    <button id="markReadBtn" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                        <i class="fas fa-envelope-open mr-1"></i>
+                        Mark as read
+                    </button>
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-gray-500 dark:text-gray-400">
+                        {% if emails and emails|length > 0 %}
+                            {{ emails|length }} emails
+                        {% else %}
+                            0 emails
+                        {% endif %}
+                    </span>
+                    
+                    <!-- Fixed pagination buttons -->
+                    {% if pagination and pagination.get('has_prev') %}
+                    <a href="{{ url_for('main.inbox', direction='prev') }}" id="prevPageBtn" class="p-1 text-gray-400 hover:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors rounded" title="Previous page">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    {% else %}
+                    <button id="prevPageBtn" class="p-1 text-gray-300 dark:text-gray-600 cursor-not-allowed rounded" disabled title="No previous page">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    {% endif %}
+                    
+                    {% if pagination and pagination.get('next_page_token') %}
+                    <a href="{{ url_for('main.inbox', direction='next', page_token=pagination.next_page_token) }}" id="nextPageBtn" class="p-1 text-gray-400 hover:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors rounded" title="Next page">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% else %}
+                    <button id="nextPageBtn" class="p-1 text-gray-300 dark:text-gray-600 cursor-not-allowed rounded" disabled title="No next page">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scrollable Email List -->
+        <div class="overflow-y-auto flex-1">
+            <div class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% if emails and emails|length > 0 %}
+                    {% for email in emails %}
+                    <!-- Gmail-style clickable email row -->
+                    <a href="{{ url_for('main.view_email', message_id=email.get('id'), page_token=pagination.get('current_page_token', '')) }}" 
+                       class="email-row flex items-start px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 cursor-pointer block {% if email.get('automation_processed', False) %}automation-processed{% endif %}"
+                       data-message-id="{{ email.get('id', '') }}"
+                       data-automation-processed="{{ email.get('automation_processed', False) }}"
+                       data-automation-rules="{{ email.get('automation_rules_applied', '') }}">
+                        <div class="flex items-start space-x-3 w-full">
+                            <input type="checkbox" 
+                                   class="email-checkbox mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" 
+                                   data-message-id="{{ email.get('id', '') }}"
+                                   onclick="event.stopPropagation()">
+                            
+                            <div class="flex-shrink-0">
+                                {% if email.get('sender') %}
+                                    <img class="h-10 w-10 rounded-full" 
+                                         src="https://picsum.photos/seed/{{ email.get('sender', '') }}/200/200.jpg" 
+                                         alt="{{ email.get('sender', '') }}"
+                                         loading="lazy">
+                                {% else %}
+                                    <div class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                                        <i class="fas fa-user text-gray-500 dark:text-gray-400"></i>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white {% if not email.get('is_read', True) %}font-semibold{% endif %}">
+                                            {% if email.get('sender') %}
+                                                {{ email.get('sender', '').split('@')[0] }}
+                                            {% else %}
+                                                Unknown Sender
+                                            {% endif %}
+                                        </p>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                                            {% if email.get('sender') %}
+                                                {{ email.get('sender', '') }}
+                                            {% else %}
+                                                No sender information
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                    
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-sm text-gray-500 dark:text-gray-400">
+                                            {{ email.get('formatted_date', '') }}
+                                        </span>
+                                        
+                                        {% if email.get('is_urgent', False) %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                            Urgent
+                                        </span>
+                                        {% endif %}
+                                        
+                                        <!-- Automation indicator -->
+                                        {% if email.get('automation_processed', False) %}
+                                        <span class="automation-indicator inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" title="Automation applied">
+                                            <i class="fas fa-robot mr-1"></i>
+                                            Auto
+                                        </span>
+                                        {% endif %}
+                                        
+                                        <button class="star-btn p-1 text-gray-400 hover:text-yellow-500" 
+                                                data-message-id="{{ email.get('id', '') }}"
+                                                data-starred="{{ email.get('is_starred', False) }}"
+                                                title="Toggle star"
+                                                onclick="event.stopPropagation()">
+                                            <i class="fas fa-star {% if email.get('is_starred', False) %}text-yellow-500{% endif %}"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <p class="text-sm font-medium text-gray-900 dark:text-white {% if not email.get('is_read', True) %}font-semibold{% endif %}">
+                                    {{ email.get('subject', '(No Subject)') }}
+                                </p>
+                                
+                                <p class="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                                    {% if email.get('snippet', '') %}
+                                        {{ email.get('snippet', '')[:150] }}{% if email.get('snippet', '')|length > 150 %}...{% endif %}
+                                    {% elif email.get('body', {}).get('text', '') %}
+                                        {{ email.get('body', {}).get('text', '')[:150] }}{% if email.get('body', {}).get('text', '')|length > 150 %}...{% endif %}
+                                    {% else %}
+                                        <em class="text-gray-400">No content available</em>
+                                    {% endif %}
+                                </p>
+                                
+                                <div class="flex items-center mt-2 space-x-4">
+                                    <button class="inline-flex items-center px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                        onclick="event.stopPropagation()">
+                                        <i class="fas fa-reply mr-1"></i>
+                                        Reply
+                                    </button>
+                                    
+                                    <button class="inline-flex items-center px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                        onclick="event.stopPropagation()">
+                                        <i class="fas fa-share mr-1"></i>
+                                        Forward
+                                    </button>
+                                    
+                                    <!-- Automation details button (only show if automation was applied) -->
+                                    {% if email.get('automation_processed', False) %}
+                                    <button class="automation-details-btn inline-flex items-center px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs font-medium text-green-700 dark:text-green-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                        data-message-id="{{ email.get('id', '') }}"
+                                        data-automation-rules="{{ email.get('automation_rules_applied', '') }}"
+                                        onclick="event.stopPropagation()">
+                                        <i class="fas fa-robot mr-1"></i>
+                                        Automation
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                <div class="text-center py-12">
+                    <i class="fas fa-inbox text-5xl text-gray-400 dark:text-gray-600 mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No emails in your inbox</h3>
+                    <p class="text-gray-500 dark:text-gray-400">
+                        {% if gmail_connected %}
+                            Your inbox is empty. Check back later for new messages.
+                        {% else %}
+                            Connect your Gmail account to see your emails.
+                        {% endif %}
+                    </p>
+                    {% if not gmail_connected %}
+                    <a href="{{ url_for('auth.gmail_authorize') }}" 
+                       class="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <i class="fab fa-google mr-2"></i>
+                        Connect Gmail
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Automation Details Modal -->
+<div id="automation-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+        <div class="mt-3">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Automation Details</h3>
+                <button id="close-automation-modal" class="text-gray-400 hover:text-gray-500">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="automation-details-content" class="text-sm text-gray-600 dark:text-gray-300">
+                <!-- Automation details will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+/* Gmail-style notification banner styles */
+.notification-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background-color: #323232;
+    color: white;
+    transform: translateY(-100%);
+    transition: transform 0.3s ease-in-out;
+}
+
+.notification-banner.show {
+    transform: translateY(0);
+}
+
+.notification-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+}
+
+.notification-message {
+    display: flex;
+    align-items: center;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.notification-close:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Automation indicator styles */
+.automation-processed {
+    border-left: 3px solid #10b981;
+}
+
+.automation-indicator {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #065f46;
+}
+
+.dark .automation-indicator {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+}
+
+.automation-details-btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    border-color: #10b981;
+    color: #065f46;
+}
+
+.dark .automation-details-btn {
+    border-color: #059669;
+    color: #6ee7b7;
+}
+
+.automation-details-btn:hover {
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.dark .automation-details-btn:hover {
+    background-color: rgba(16, 185, 129, 0.2);
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global variables to store pagination state
+let paginationState = {
+    hasPrev: false,
+    hasNext: false,
+    nextToken: null,
+    prevToken: null,
+    currentToken: null
+};
+
+// Function to initialize email count on page load
+function initializeEmailCount() {
+    // Get current email count from the page
+    const emailCountElement = document.querySelector('.text-sm.text-gray-500.dark\\:text-gray-400');
+    const currentCount = emailCountElement ? 
+        parseInt(emailCountElement.textContent.trim().split(' ')[0]) || 0 : 0;
+    
+    // Store the current count in localStorage
+    localStorage.setItem('emailCount', currentCount.toString());
+}
+
+// Function to check for new emails
+function checkNewEmails(initializeOnly = false) {
+    fetch('/api/check-new-emails')
+        .then(response => response.json())
+        .then(data => {
+            const newCount = data.totalEmailCount || 0;
+            const storedCount = parseInt(localStorage.getItem('emailCount')) || 0;
+            
+            // If this is just for initialization, update the count and don't show notification
+            if (initializeOnly) {
+                localStorage.setItem('emailCount', newCount.toString());
+                return;
+            }
+            
+            // Only show notification if new emails have arrived
+            if (newCount > storedCount) {
+                // Show notification with count of new emails
+                showNotification(newCount - storedCount);
+                
+                // Update the stored count
+                localStorage.setItem('emailCount', newCount.toString());
+            }
+        })
+        .catch(error => console.error('Error checking for new emails:', error));
+}
+
+// Function to show notification
+function showNotification(newEmailsCount) {
+    const notificationBanner = document.getElementById('notification-banner');
+    const notificationText = document.getElementById('notification-text');
+    
+    // Update notification text with count
+    notificationText.textContent = `You have ${newEmailsCount} new email${newEmailsCount > 1 ? 's' : ''}`;
+    
+    // Show notification
+    notificationBanner.classList.remove('hidden');
+    setTimeout(() => {
+        notificationBanner.classList.add('show');
+    }, 10);
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        hideNotification();
+    }, 5000);
+}
+
+// Function to hide notification
+function hideNotification() {
+    const notificationBanner = document.getElementById('notification-banner');
+    notificationBanner.classList.remove('show');
+    
+    // Wait for animation to complete before hiding
+    setTimeout(() => {
+        notificationBanner.classList.add('hidden');
+    }, 300);
+}
+
+// Function to show automation details modal
+function showAutomationDetails(messageId, ruleIds) {
+    const modal = document.getElementById('automation-modal');
+    const content = document.getElementById('automation-details-content');
+    
+    // Fetch automation details for this email
+    fetch(`/api/automation-details/${messageId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Build HTML content for the modal
+                let html = '<div class="space-y-3">';
+                
+                // Show automation timestamp
+                if (data.automation_processed_at) {
+                    const date = new Date(data.automation_processed_at);
+                    html += `<div><strong>Processed:</strong> ${date.toLocaleString()}</div>`;
+                }
+                
+                // Show applied rules
+                if (data.rules && data.rules.length > 0) {
+                    html += '<div><strong>Applied Rules:</strong><ul class="mt-1 ml-4 list-disc">';
+                    data.rules.forEach(rule => {
+                        html += `<li>${rule.name}</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+                
+                // Show automation logs
+                if (data.logs && data.logs.length > 0) {
+                    html += '<div><strong>Actions:</strong><ul class="mt-1 ml-4 list-disc">';
+                    data.logs.forEach(log => {
+                        const statusClass = log.status === 'success' ? 'text-green-600' : 'text-red-600';
+                        html += `<li><span class="${statusClass}">${log.action_type}</span>: ${log.message}</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+                
+                html += '</div>';
+                content.innerHTML = html;
+                
+                // Show the modal
+                modal.classList.remove('hidden');
+            } else {
+                showToast(data.error || 'Failed to load automation details', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading automation details:', error);
+            showToast('Error loading automation details', 'error');
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize email count on page load (don't show notification)
+    initializeEmailCount();
+    
+    // Initialize pagination state from Flask template
+    {% if pagination %}
+        paginationState.hasPrev = {{ 'true' if pagination.get('has_prev') else 'false' }};
+        paginationState.hasNext = {{ 'true' if pagination.get('next_page_token') else 'false' }};
+        paginationState.nextToken = "{{ pagination.get('next_page_token', '') }}";
+        paginationState.prevToken = "{{ pagination.get('prev_page_token', '') }}";
+        paginationState.currentToken = "{{ pagination.get('current_page_token', '') }}";
+    {% endif %}
+    
+    // Set up notification close button
+    const notificationClose = document.getElementById('notification-close');
+    if (notificationClose) {
+        notificationClose.addEventListener('click', hideNotification);
+    }
+    
+    // Set up automation modal close button
+    const closeAutomationModal = document.getElementById('close-automation-modal');
+    if (closeAutomationModal) {
+        closeAutomationModal.addEventListener('click', function() {
+            document.getElementById('automation-modal').classList.add('hidden');
+        });
+    }
+    
+    // Set up automation details buttons
+    document.querySelectorAll('.automation-details-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const messageId = this.dataset.messageId;
+            const ruleIds = this.dataset.automationRules;
+            showAutomationDetails(messageId, ruleIds);
+        });
+    });
+    
+    // GSAP animations for email items
+    if (typeof gsap !== 'undefined') {
+        gsap.from(".email-row", {
+            duration: 0.5,
+            x: -20,
+            opacity: 0,
+            stagger: 0.05,
+            ease: "power2.out"
+        });
+    }
+    
+    // Select all functionality
+    const selectAll = document.getElementById('selectAll');
+    const emailCheckboxes = document.querySelectorAll('.email-checkbox');
+    
+    selectAll.addEventListener('change', function() {
+        emailCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+    });
+    
+    // Star functionality
+    document.querySelectorAll('.star-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const messageId = this.dataset.messageId;
+            const isStarred = this.dataset.starred === 'true';
+            const icon = this.querySelector('i');
+            
+            if (!messageId) return;
+            
+            // Toggle star state
+            if (icon.classList.contains('text-yellow-500')) {
+                icon.classList.remove('text-yellow-500');
+                this.dataset.starred = 'false';
+            } else {
+                icon.classList.add('text-yellow-500');
+                this.dataset.starred = 'true';
+            }
+            
+            // Make API call to toggle star
+            fetch(`/api/toggle-star/${messageId}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    // Revert if API call failed
+                    if (icon.classList.contains('text-yellow-500')) {
+                        icon.classList.remove('text-yellow-500');
+                        this.dataset.starred = 'false';
+                    } else {
+                        icon.classList.add('text-yellow-500');
+                        this.dataset.starred = 'true';
+                    }
+                    showToast(data.error || 'Failed to update star status', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error toggling star:', error);
+                showToast('Error toggling star', 'error');
+            });
+        });
+    });
+    
+    // Archive functionality
+    const archiveBtn = document.getElementById('archiveBtn');
+    archiveBtn.addEventListener('click', function() {
+        const selectedEmails = getSelectedEmailIds();
+        if (selectedEmails.length === 0) {
+            showToast('Please select at least one email to archive', 'warning');
+            return;
+        }
+        
+        // Archive each selected email
+        let promises = selectedEmails.map(emailId => {
+            return fetch(`/api/archive/${emailId}`, {
+                method: 'POST'
+            });
+        });
+        
+        Promise.all(promises)
+        .then(responses => Promise.all(responses.map(r => r.json())))
+        .then(results => {
+            const failed = results.filter(r => !r.success);
+            if (failed.length === 0) {
+                showToast(`${selectedEmails.length} email(s) archived successfully`, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showToast(`Failed to archive ${failed.length} email(s)`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error archiving emails:', error);
+            showToast('Error archiving emails', 'error');
+        });
+    });
+    
+    // Delete functionality
+    const deleteBtn = document.getElementById('deleteBtn');
+    deleteBtn.addEventListener('click', function() {
+        const selectedEmails = getSelectedEmailIds();
+        if (selectedEmails.length === 0) {
+            showToast('Please select at least one email to delete', 'warning');
+            return;
+        }
+        
+        if (!confirm(`Are you sure you want to delete ${selectedEmails.length} email(s)?`)) {
+            return;
+        }
+        
+        // Delete each selected email
+        let promises = selectedEmails.map(emailId => {
+            return fetch(`/api/delete/${emailId}`, {
+                method: 'DELETE'
+            });
+        });
+        
+        Promise.all(promises)
+        .then(responses => Promise.all(responses.map(r => r.json())))
+        .then(results => {
+            const failed = results.filter(r => !r.success);
+            if (failed.length === 0) {
+                showToast(`${selectedEmails.length} email(s) deleted successfully`, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showToast(`Failed to delete ${failed.length} email(s)`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting emails:', error);
+            showToast('Error deleting emails', 'error');
+        });
+    });
+    
+    // Mark as read functionality
+    const markReadBtn = document.getElementById('markReadBtn');
+    markReadBtn.addEventListener('click', function() {
+        const selectedEmails = getSelectedEmailIds();
+        if (selectedEmails.length === 0) {
+            showToast('Please select at least one email to mark as read', 'warning');
+            return;
+        }
+        
+        // Mark each selected email as read
+        let promises = selectedEmails.map(emailId => {
+            return fetch(`/api/mark-read/${emailId}`, {
+                method: 'POST'
+            });
+        });
+        
+        Promise.all(promises)
+        .then(responses => Promise.all(responses.map(r => r.json())))
+        .then(results => {
+            const failed = results.filter(r => !r.success);
+            if (failed.length === 0) {
+                showToast(`${selectedEmails.length} email(s) marked as read`, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showToast(`Failed to mark ${failed.length} email(s) as read`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error marking emails as read:', error);
+            showToast('Error marking emails as read', 'error');
+        });
+    });
+    
+    // Refresh functionality
+    const refreshBtn = document.getElementById('refreshBtn');
+    refreshBtn.addEventListener('click', function() {
+        const icon = this.querySelector('i');
+        icon.classList.add('fa-spin');
+        
+        fetch('/refresh-inbox', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Check for new emails after refresh
+                checkNewEmails(false);
+                
+                showToast(`Inbox refreshed (${data.emails_count} emails)`, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showToast(data.error || 'Failed to refresh inbox', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error refreshing inbox', 'error');
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            icon.classList.remove('fa-spin');
+        });
+    });
+    
+    // Helper function to get selected email IDs
+    function getSelectedEmailIds() {
+        const checkboxes = document.querySelectorAll('.email-checkbox:checked');
+        return Array.from(checkboxes).map(cb => cb.dataset.messageId).filter(id => id);
+    }
+    
+    // Pagination functionality
+    function updatePaginationButtons() {
+        const prevBtn = document.getElementById('prevPageBtn');
+        const nextBtn = document.getElementById('nextPageBtn');
+        
+        // Update Previous button
+        if (prevBtn) {
+            if (paginationState.hasPrev) {
+                prevBtn.disabled = false;
+                prevBtn.classList.remove('cursor-not-allowed');
+                prevBtn.classList.add('hover:text-gray-500');
+                prevBtn.classList.remove('text-gray-300');
+                prevBtn.classList.add('cursor-pointer');
+            } else {
+                prevBtn.disabled = true;
+                prevBtn.classList.add('cursor-not-allowed');
+                prevBtn.classList.remove('hover:text-gray-500');
+                prevBtn.classList.add('text-gray-300');
+            }
+        }
+        
+        // Update Next button
+        if (nextBtn) {
+            if (paginationState.hasNext) {
+                nextBtn.disabled = false;
+                nextBtn.classList.remove('cursor-not-allowed');
+                nextBtn.classList.add('hover:text-gray-500');
+                nextBtn.classList.remove('text-gray-300');
+                nextBtn.classList.add('cursor-pointer');
+            } else {
+                nextBtn.disabled = true;
+                nextBtn.classList.add('cursor-not-allowed');
+                nextBtn.classList.remove('hover:text-gray-500');
+                nextBtn.classList.add('text-gray-300');
+            }
+        }
+    }
+    
+    // Navigate to a specific page
+    function navigateToPage(direction) {
+        // Create URL based on direction
+        let url = `/inbox?direction=${direction}`;
+        
+        // Add appropriate page token based on direction
+        if (direction === 'next' && paginationState.nextToken) {
+            url += `&page_token=${encodeURIComponent(paginationState.nextToken)}`;
+        }
+        // Note: Previous doesn't need page_token as it's handled by session token_stack
+        
+        // Navigate
+        window.location.href = url;
+    }
+    
+    // Initialize pagination buttons
+    updatePaginationButtons();
+    
+    // Add event listeners for pagination buttons
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+    
+    if (prevBtn && prevBtn.tagName === 'BUTTON') {
+        prevBtn.addEventListener('click', function() {
+            if (!this.disabled && paginationState.hasPrev) {
+                navigateToPage('prev');
+            }
+        });
+    }
+    
+    if (nextBtn && nextBtn.tagName === 'BUTTON') {
+        nextBtn.addEventListener('click', function() {
+            if (!this.disabled && paginationState.hasNext) {
+                navigateToPage('next');
+            }
+        });
+    }
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + R to refresh
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+            e.preventDefault();
+            refreshBtn.click();
+        }
+        
+        // Ctrl/Cmd + N for new email
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+            e.preventDefault();
+            window.location.href = '/compose';
+        }
+        
+        // Escape to go back to dashboard
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            window.location.href = '/dashboard';
+        }
+        
+        // Left arrow for previous page
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (paginationState.hasPrev) {
+                navigateToPage('prev');
+            }
+        }
+        
+        // Right arrow for next page
+        if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            if (paginationState.hasNext) {
+                navigateToPage('next');
+            }
+        }
+    });
+    
+    // Auto-refresh every 5 minutes - check for new emails in background
+    setInterval(() => {
+        if (!document.hidden) {
+            // Check for new emails in background
+            checkNewEmails(false);
+        }
+    }, 300000); // 5 minutes
+});
+</script>
+{% endblock %}

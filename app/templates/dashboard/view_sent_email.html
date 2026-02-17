@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ sent_email.subject or '(No Subject)' }} - AI Email Dashboard
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center">
+            <a href="{{ url_for('main.sent_emails') }}" class="mr-4 text-white hover:text-gray-200">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Sent Emails
+            </a>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">View Sent Email</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <button id="refreshBtn" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Refresh
+            </button>
+            <button onclick="resendEmail({{ sent_email.id }})"
+                    class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fas fa-redo mr-2"></i>
+                Resend
+            </button>
+        </div>
+    </div>
+    
+    <div class="glass rounded-xl overflow-hidden neumorphic">
+        <!-- Gmail-like Email Header -->
+        <div class="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+            <div class="flex items-start">
+                <div class="flex-shrink-0 mr-4">
+                    <div class="h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                        <i class="fas fa-paper-plane text-indigo-600 dark:text-indigo-400"></i>
+                    </div>
+                </div>
+                
+                <div class="flex-1 min-w-0">
+                    <!-- Gmail-like header with subject and date aligned -->
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                From: {{ current_user.email }}
+                            </p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                To: {{ sent_email.to or 'No recipient' }}
+                            </p>
+                            {% if sent_email.cc %}
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                Cc: {{ sent_email.cc }}
+                            </p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Date and status aligned with subject line -->
+                        <div class="flex items-center space-x-2 ml-4">
+                            <span class="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                {% if sent_email.sent_at %}
+                                    {{ sent_email.sent_at.strftime('%b %d, %Y %I:%M %p') }}
+                                {% else %}
+                                    Unknown Date
+                                {% endif %}
+                            </span>
+                            
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                <i class="fas fa-check-circle mr-1"></i>
+                                Sent
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Subject line aligned with date above -->
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                        {{ sent_email.subject or '(No Subject)' }}
+                    </h2>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Email Actions -->
+        <div class="border-b border-gray-200 dark:border-gray-700 px-6 py-3">
+            <div class="flex items-center space-x-4">
+                <button id="replyBtn" class="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-reply mr-2"></i>
+                    Reply
+                </button>
+                
+                <button id="replyAllBtn" class="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-reply-all mr-2"></i>
+                    Reply All
+                </button>
+                
+                <button id="forwardBtn" class="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-share mr-2"></i>
+                    Forward
+                </button>
+                
+                <button onclick="resendEmail({{ sent_email.id }})" class="inline-flex items-center px-3 py-1.5 border border-blue-300 dark:border-blue-600 rounded-md shadow-sm text-sm font-medium text-blue-700 dark:text-blue-200 bg-white dark:bg-blue-700 hover:bg-blue-50 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i class="fas fa-redo mr-2"></i>
+                    Resend
+                </button>
+                
+                <button id="deleteBtn" class="inline-flex items-center px-3 py-1.5 border border-red-300 dark:border-red-600 rounded-md shadow-sm text-sm font-medium text-red-700 dark:text-red-200 bg-white dark:bg-red-700 hover:bg-red-50 dark:hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                    <i class="fas fa-trash mr-2"></i>
+                    Delete
+                </button>
+            </div>
+        </div>
+        
+        <!-- Email Body -->
+        <div class="px-6 py-6">
+            <div class="prose prose-gray dark:prose-invert max-w-none email-body">
+                {% if sent_email.body_html %}
+                    <div class="email-content-container">
+                        {{ sent_email.body_html|safe }}
+                    </div>
+                {% elif sent_email.body_text %}
+                    <pre class="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 p-4 rounded-md overflow-x-auto">{{ sent_email.body_text }}</pre>
+                {% elif sent_email.snippet %}
+                    <p class="text-gray-700 dark:text-gray-300">{{ sent_email.snippet }}</p>
+                {% else %}
+                    <p class="text-gray-500 dark:text-gray-400 italic">No content available</p>
+                {% endif %}
+            </div>
+            
+            <!-- Attachments -->
+            {% if sent_email.attachments %}
+            <div class="mt-6">
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Attachments</h3>
+                <div class="space-y-2">
+                    {% for attachment in sent_email.attachments %}
+                    <div class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-md">
+                        <div class="flex items-center">
+                            <i class="fas fa-paperclip text-gray-400 mr-3"></i>
+                            <span class="text-sm font-medium text-gray-900 dark:text-white">{{ attachment.get('filename') or attachment.get('name', 'Unknown') }}</span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400 ml-2">({{ attachment.get('size', 'Unknown size') }})</span>
+                        </div>
+                        <a href="{{ url_for('main.download_attachment', message_id=sent_email.gmail_id, attachment_id=attachment.get('id')) }}" class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Fix for Gmail HTML email rendering in dark mode */
+    .email-body {
+        color: #000000ff; /* gray-700 for light mode */
+    }
+    
+    .dark .email-body {
+        color: #E5E7EB; /* gray-200 for dark mode */
+    }
+    
+    /* Reset all email content to inherit from parent */
+    .email-body * {
+        background-color: inherit !important;
+        color: inherit !important;
+        filter: none !important;
+        mix-blend-mode: normal !important;
+    }
+    
+    /* Ensure images are not inverted */
+    .email-body img {
+        filter: none !important;
+        opacity: 1 !important;
+        max-width: 100%;
+        height: auto;
+    }
+    
+    /* Style links to be visible in both modes */
+    .email-body a {
+        color: #4f46e5 !important; /* indigo-600 */
+        text-decoration: underline;
+    }
+    
+    .dark .email-body a {
+        color: #818cf8 !important; /* indigo-400 */
+    }
+    
+    /* Style code blocks for better readability */
+    .email-body pre, .email-body code {
+        background-color: #f9fafb !important; /* gray-50 */
+        color: #111827 !important; /* gray-900 */
+        border-radius: 0.375rem;
+        padding: 0.5rem;
+        overflow-x: auto;
+    }
+    
+    .dark .email-body pre, .dark .email-body code {
+        background-color: #1f2937 !important; /* gray-800 */
+        color: #f9fafb !important; /* gray-50 */
+    }
+    
+    /* Style blockquotes */
+    .email-body blockquote {
+        border-left: 4px solid #e5e7eb !important; /* gray-200 */
+        padding-left: 1rem;
+        margin: 1rem 0;
+        color: #6b7280 !important; /* gray-500 */
+    }
+    
+    .dark .email-body blockquote {
+        border-left: 4px solid #4b5563 !important; /* gray-600 */
+        color: #9ca3af !important; /* gray-400 */
+    }
+    
+    /* Ensure tables are readable */
+    .email-body table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+    
+    .email-body th, .email-body td {
+        border: 1px solid #e5e7eb !important; /* gray-200 */
+        padding: 0.5rem;
+    }
+    
+    .dark .email-body th, .dark .email-body td {
+        border: 1px solid #4b5563 !important; /* gray-600 */
+    }
+    
+    .email-body th {
+        background-color: #f9fafb !important; /* gray-50 */
+        color: #111827 !important; /* gray-900 */
+    }
+    
+    .dark .email-body th {
+        background-color: #1f2937 !important; /* gray-800 */
+        color: #f9fafb !important; /* gray-50 */
+    }
+    
+    /* Ensure text in divs and spans is readable */
+    .email-body div, .email-body span, .email-body p {
+        color: inherit !important;
+    }
+    
+    /* Handle inline styles that might set colors */
+    .email-body [style*="color"] {
+        color: inherit !important;
+    }
+    
+    .email-body [style*="background"] {
+        background-color: transparent !important;
+    }
+    
+    /* Fix for email content container */
+    .email-content-container {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+    
+    /* Ensure proper text wrapping */
+    .email-content-container * {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Reply functionality
+    const replyBtn = document.getElementById('replyBtn');
+    if (replyBtn) {
+        replyBtn.addEventListener('click', function() {
+            if (confirm('This will create a new email to reply to the original recipients. Continue?')) {
+                window.location.href = `/compose?reply_to_sent={{ sent_email.id }}`;
+            }
+        });
+    }
+    
+    // Reply All functionality
+    const replyAllBtn = document.getElementById('replyAllBtn');
+    if (replyAllBtn) {
+        replyAllBtn.addEventListener('click', function() {
+            if (confirm('This will create a new email to reply to all original recipients. Continue?')) {
+                window.location.href = `/compose?reply_all_sent={{ sent_email.id }}`;
+            }
+        });
+    }
+    
+    // Forward functionality
+    const forwardBtn = document.getElementById('forwardBtn');
+    if (forwardBtn) {
+        forwardBtn.addEventListener('click', function() {
+            if (confirm('This will create a new email to forward this message. Continue?')) {
+                window.location.href = `/compose?forward_sent={{ sent_email.id }}`;
+            }
+        });
+    }
+    
+    // Delete functionality
+    const deleteBtn = document.getElementById('deleteBtn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to delete this sent email?')) {
+                fetch(`/api/delete-sent-email/{{ sent_email.id }}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('Email deleted successfully', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/sent-emails';
+                        }, 1000);
+                    } else {
+                        showToast(data.error || 'Failed to delete email', 'error');
+                    }
+                })
+                .catch(error => {
+                    showToast('Error deleting email', 'error');
+                    console.error('Error:', error);
+                });
+            }
+        });
+    }
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // R to reply
+        if (e.key === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            if (replyBtn) replyBtn.click();
+        }
+        
+        // F to forward
+        if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            if (forwardBtn) forwardBtn.click();
+        }
+        
+        // Delete key to delete
+        if (e.key === 'Delete') {
+            e.preventDefault();
+            if (deleteBtn) deleteBtn.click();
+        }
+        
+        // Escape to go back to sent emails
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            window.location.href = '/sent-emails';
+        }
+    });
+});
+
+function resendEmail(emailId) {
+    if (!confirm("Resend this email?")) return;
+
+    fetch(`/api/resend-sent-email/${emailId}`, { method: "POST" })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast("Email resent successfully", "success");
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast("Failed to resend email", "error");
+            }
+        })
+        .catch(() => showToast("Error resending email", "error"));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,641 @@
+{% extends "base.html" %}
+
+{% block title %}Sent Emails - AI Email Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto h-screen flex flex-col">
+    <div class="flex items-center justify-between mb-6 pb-4">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Sent</h1>
+        <div class="flex items-center space-x-4">
+            <button id="refreshBtn" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Refresh
+            </button>
+            <a href="{{ url_for('main.compose') }}" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fas fa-edit mr-2"></i>
+                Compose
+            </a>
+        </div>
+    </div>
+    
+    <!-- Search and Filter Bar -->
+    <div class="glass rounded-xl p-4 mb-6 neumorphic">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div class="flex-1 max-w-lg">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                    <form method="GET" action="{{ url_for('main.sent_emails') }}" class="w-full">
+                        <input type="text" name="search" value="{{ search or '' }}" class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Search sent emails...">
+                    </form>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <form method="GET" action="{{ url_for('main.sent_emails') }}" class="flex items-center space-x-3">
+                    <input type="hidden" name="search" value="{{ search or '' }}">
+                    <input type="hidden" name="status" value="{{ status or 'sent' }}">
+                    <select name="date_filter" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="all" {% if date_filter == 'all' %}selected{% endif %}>All Time</option>
+                        <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Today</option>
+                        <option value="week" {% if date_filter == 'week' %}selected{% endif %}>This Week</option>
+                        <option value="month" {% if date_filter == 'month' %}selected{% endif %}>This Month</option>
+                    </select>
+                    <select name="page_size" id="pageSize" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="20" {% if page_size == 20 %}selected{% endif %}>20 per page</option>
+                        <option value="50" {% if page_size == 50 %}selected{% endif %}>50 per page</option>
+                    </select>
+                    <button type="submit" class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
+                        <i class="fas fa-filter mr-2"></i>Filter
+                    </button>
+                </form>
+                <button id="selectAllBtn" class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <i class="fas fa-check-square mr-2"></i>Select All
+                </button>
+                <button id="deleteSelectedBtn" class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 hidden">
+                    <i class="fas fa-trash mr-2"></i>Delete Selected
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Gmail-style Navigation Tabs -->
+    <div class="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+        <a href="{{ url_for('main.sent_emails', status='sent', search=search, date_filter=date_filter, page_size=page_size) }}" 
+           class="px-4 py-2 text-sm font-medium {% if status == 'sent' or not status %}text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300{% endif %}">
+            <i class="fas fa-paper-plane mr-2"></i>Sent
+        </a>
+        <a href="{{ url_for('main.sent_emails', status='scheduled', search=search, date_filter=date_filter, page_size=page_size) }}" 
+           class="px-4 py-2 text-sm font-medium {% if status == 'scheduled' %}text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300{% endif %}">
+            <i class="fas fa-clock mr-2"></i>Scheduled
+        </a>
+        <a href="{{ url_for('main.sent_emails', status='failed', search=search, date_filter=date_filter, page_size=page_size) }}" 
+           class="px-4 py-2 text-sm font-medium {% if status == 'failed' %}text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300{% endif %}">
+            <i class="fas fa-exclamation-circle mr-2"></i>Failed
+        </a>
+    </div>
+    
+    <!-- Loading indicator -->
+    <div id="loadingIndicator" class="flex justify-center items-center py-8 hidden">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <span class="ml-2 text-gray-600 dark:text-gray-400">Loading emails...</span>
+    </div>
+    
+    <!-- Sent Emails List with Gmail-style layout -->
+    <div id="emailsContainer" class="glass rounded-xl overflow-hidden neumorphic flex-1 flex flex-col">
+        <div class="overflow-y-auto flex-1">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            <input type="checkbox" id="selectAllCheckbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Recipient
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Subject
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Preview
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Date
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Status
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="emailsTableBody" class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                    {% if sent_emails and sent_emails|length > 0 %}
+                        {% for email in sent_emails %}
+                        <tr class="email-row hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 cursor-pointer" 
+                            onclick="window.location.href='{{ url_for('main.view_sent_email', email_id=email.id) }}'"
+                            data-email-id="{{ email.id }}" 
+                            data-gmail-id="{{ email.gmail_id }}">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <input type="checkbox" class="email-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
+                                       data-email-id="{{ email.id }}"
+                                       onclick="event.stopPropagation()">
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center mr-3">
+                                        <i class="fas fa-user text-indigo-600 dark:text-indigo-400 text-xs"></i>
+                                    </div>
+                                    <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                        {{ email.to or 'No recipient' }}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm font-medium text-gray-900 dark:text-white truncate max-w-xs">
+                                    {{ email.subject or '(no subject)' }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 max-w-md">
+                                    {{ email.snippet or '' }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-500 dark:text-gray-400">
+                                    {% if email.sent_at %}
+                                        {{ email.sent_at | format_date }}
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if email.status == 'Sent' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    <i class="fas fa-check-circle mr-1"></i>Sent
+                                </span>
+                                {% elif email.status == 'Scheduled' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                    <i class="fas fa-clock mr-1"></i>Scheduled
+                                </span>
+                                {% elif email.status == 'Failed' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>Failed
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    <i class="fas fa-check-circle mr-1"></i>{{ email.status }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                <div class="flex space-x-2">
+                                    <button onclick="event.stopPropagation(); viewEmail({{ email.id }})" 
+                                            class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300" 
+                                            title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); resendEmail({{ email.id }})" 
+                                            class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300" 
+                                            title="Resend">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); deleteEmail({{ email.id }})" 
+                                            class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300" 
+                                            title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center">
+                            <i class="fas fa-paper-plane text-5xl text-gray-400 dark:text-gray-600 mb-4"></i>
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No sent emails</h3>
+                            <p class="text-gray-500 dark:text-gray-400 mb-4">
+                                You haven't sent any emails yet.
+                            </p>
+                            <a href="{{ url_for('main.compose') }}" 
+                               class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <i class="fas fa-edit mr-2"></i>
+                                Compose Email
+                            </a>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Load More Button -->
+        {% if pagination and pagination.has_next %}
+        <div id="loadMoreContainer" class="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-center border-t border-gray-200 dark:border-gray-700">
+            <button id="loadMoreBtn" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                Load More
+            </button>
+        </div>
+        {% endif %}
+        
+        <!-- Gmail-style Pagination -->
+        {% if pagination %}
+        <div class="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
+            <div class="flex-1 flex justify-between sm:hidden">
+                {% if pagination.has_prev %}
+                <a href="{{ url_for('main.sent_emails', page_token=pagination.prev_page_token, page_size=page_size, search=search, date_filter=date_filter, status=status) }}" 
+                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600">
+                    Previous
+                </a>
+                {% endif %}
+                {% if pagination.has_next %}
+                <a href="{{ url_for('main.sent_emails', page_token=pagination.next_page_token, page_size=page_size, search=search, date_filter=date_filter, status=status) }}" 
+                   class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600">
+                    Next
+                </a>
+                {% endif %}
+            </div>
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700 dark:text-gray-300">
+                        Showing
+                        <span class="font-medium" id="startCount">{{ pagination.start_index or 1 }}</span>
+                        to
+                        <span class="font-medium" id="endCount">{{ pagination.end_index or sent_emails|length }}</span>
+                        of
+                        <span class="font-medium">{{ total_count }}</span>
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        {% if pagination.has_prev %}
+                        <a href="{{ url_for('main.sent_emails', page_token=pagination.prev_page_token, page_size=page_size, search=search, date_filter=date_filter, status=status) }}" 
+                           class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600">
+                            <span class="sr-only">Previous</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                        {% endif %}
+                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600">
+                            {{ pagination.current_page or 1 }}
+                        </span>
+                        {% if pagination.has_next %}
+                        <a href="{{ url_for('main.sent_emails', page_token=pagination.next_page_token, page_size=page_size, search=search, date_filter=date_filter, status=status) }}" 
+                           class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600">
+                            <span class="sr-only">Next</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        {% endif %}
+                    </nav>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // State variables for lazy loading
+    let currentPage = 1;
+    let isLoading = false;
+    let hasMore = {{ 'true' if pagination and pagination.has_next else 'false' }};
+    const pageSize = {{ page_size or 20 }};
+    
+    // DOM elements
+    const emailsTableBody = document.getElementById('emailsTableBody');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const loadMoreBtn = document.getElementById('loadMoreBtn');
+    const loadMoreContainer = document.getElementById('loadMoreContainer');
+    const startCount = document.getElementById('startCount');
+    const endCount = document.getElementById('endCount');
+    
+    // Get URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const search = urlParams.get('search') || '';
+    const status = urlParams.get('status') || 'sent';
+    const dateFilter = urlParams.get('date_filter') || 'all';
+    
+    // Load more button functionality
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', function() {
+            loadMoreEmails();
+        });
+    }
+    
+    // Function to load more emails
+    function loadMoreEmails() {
+        if (isLoading || !hasMore) return;
+        
+        isLoading = true;
+        loadingIndicator.classList.remove('hidden');
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading...';
+        
+        // Get next page token
+        const nextPageToken = '{{ pagination.next_page_token if pagination else "" }}';
+        
+        // Fetch more emails
+        fetch(`/api/sent-emails?page=${currentPage + 1}&search=${encodeURIComponent(search)}&status=${status}&date_filter=${dateFilter}&page_size=${pageSize}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentPage++;
+                    hasMore = data.has_more;
+                    
+                    // Append new emails to the table
+                    appendEmails(data.emails);
+                    
+                    // Update count display
+                    const currentEnd = parseInt(endCount.textContent);
+                    const newEnd = currentEnd + data.emails.length;
+                    endCount.textContent = newEnd;
+                    
+                    // Hide load more button if no more emails
+                    if (!hasMore) {
+                        loadMoreContainer.style.display = 'none';
+                    }
+                } else {
+                    showToast('Failed to load more emails: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading more emails:', error);
+                showToast('Error loading more emails', 'error');
+            })
+            .finally(() => {
+                isLoading = false;
+                loadingIndicator.classList.add('hidden');
+                loadMoreBtn.disabled = false;
+                loadMoreBtn.innerHTML = 'Load More';
+            });
+    }
+    
+    // Function to append emails to the table
+    function appendEmails(newEmails) {
+        newEmails.forEach(email => {
+            const row = document.createElement('tr');
+            row.className = 'email-row hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 cursor-pointer';
+            row.setAttribute('data-email-id', email.id);
+            row.setAttribute('data-gmail-id', email.gmail_id || '');
+            row.onclick = function() {
+                window.location.href = `/sent-email/${email.id}`;
+            };
+            
+            // Format date
+            let formattedDate = '';
+            if (email.sent_at) {
+                const date = new Date(email.sent_at);
+                formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            }
+            
+            // Format status
+            let statusHtml = '';
+            if (email.status === 'Sent') {
+                statusHtml = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><i class="fas fa-check-circle mr-1"></i>Sent</span>';
+            } else if (email.status === 'Scheduled') {
+                statusHtml = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"><i class="fas fa-clock mr-1"></i>Scheduled</span>';
+            } else if (email.status === 'Failed') {
+                statusHtml = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"><i class="fas fa-exclamation-circle mr-1"></i>Failed</span>';
+            } else {
+                statusHtml = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><i class="fas fa-check-circle mr-1"></i>${email.status}</span>`;
+            }
+            
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <input type="checkbox" class="email-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
+                           data-email-id="${email.id}"
+                           onclick="event.stopPropagation()">
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <div class="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center mr-3">
+                            <i class="fas fa-user text-indigo-600 dark:text-indigo-400 text-xs"></i>
+                        </div>
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">
+                            ${email.to || 'No recipient'}
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white truncate max-w-xs">
+                        ${email.subject || '(no subject)'}
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 max-w-md">
+                        ${email.snippet || ''}
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        ${formattedDate}
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    ${statusHtml}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <div class="flex space-x-2">
+                        <button onclick="event.stopPropagation(); viewEmail(${email.id})" 
+                                class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300" 
+                                title="View">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); resendEmail(${email.id})" 
+                                class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300" 
+                                title="Resend">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); deleteEmail(${email.id})" 
+                                class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300" 
+                                title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            
+            emailsTableBody.appendChild(row);
+            
+            // Add event listener to checkbox
+            const checkbox = row.querySelector('.email-checkbox');
+            checkbox.addEventListener('change', function() {
+                // Update select all checkbox state
+                const allCheckboxes = document.querySelectorAll('.email-checkbox');
+                const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+                const someChecked = Array.from(allCheckboxes).some(cb => cb.checked);
+                
+                selectAllCheckbox.checked = allChecked;
+                selectAllCheckbox.indeterminate = someChecked && !allChecked;
+                
+                toggleDeleteSelectedButton();
+            });
+        });
+        
+        // Reinitialize checkbox functionality
+        initializeCheckboxFunctionality();
+    }
+    
+    // Page size change handler
+    const pageSizeSelect = document.getElementById('pageSize');
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+            const pageSize = this.value;
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('page_size', pageSize);
+            window.location.href = currentUrl.toString();
+        });
+    }
+    
+    // Initialize checkbox functionality
+    function initializeCheckboxFunctionality() {
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        const emailCheckboxes = document.querySelectorAll('.email-checkbox');
+        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+        
+        if (!selectAllCheckbox || emailCheckboxes.length === 0) return;
+        
+        selectAllCheckbox.addEventListener('change', function() {
+            emailCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            toggleDeleteSelectedButton();
+        });
+        
+        emailCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                // Update select all checkbox state
+                const allChecked = Array.from(emailCheckboxes).every(cb => cb.checked);
+                const someChecked = Array.from(emailCheckboxes).some(cb => cb.checked);
+                
+                selectAllCheckbox.checked = allChecked;
+                selectAllCheckbox.indeterminate = someChecked && !allChecked;
+                
+                toggleDeleteSelectedButton();
+            });
+        });
+    }
+    
+    // Initialize on page load
+    initializeCheckboxFunctionality();
+    
+    function toggleDeleteSelectedButton() {
+        const emailCheckboxes = document.querySelectorAll('.email-checkbox');
+        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+        const anyChecked = Array.from(emailCheckboxes).some(cb => cb.checked);
+        deleteSelectedBtn.classList.toggle('hidden', !anyChecked);
+    }
+    
+    // Select All button functionality
+    document.getElementById('selectAllBtn').addEventListener('click', function() {
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        const emailCheckboxes = document.querySelectorAll('.email-checkbox');
+        
+        selectAllCheckbox.checked = true;
+        emailCheckboxes.forEach(checkbox => {
+            checkbox.checked = true;
+        });
+        toggleDeleteSelectedButton();
+    });
+    
+    // Delete Selected button functionality
+    document.getElementById('deleteSelectedBtn').addEventListener('click', function() {
+        const emailCheckboxes = document.querySelectorAll('.email-checkbox');
+        const selectedIds = Array.from(emailCheckboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.dataset.emailId);
+            
+        if (selectedIds.length === 0) return;
+        
+        if (confirm(`Are you sure you want to delete ${selectedIds.length} sent email(s)?`)) {
+            fetch('/api/delete-selected-sent-emails', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email_ids: selectedIds })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    selectedIds.forEach(id => {
+                        const row = document.querySelector(`[data-email-id="${id}"]`);
+                        if (row) row.remove();
+                    });
+                    
+                    showToast(`${selectedIds.length} email(s) deleted successfully`, 'success');
+                    
+                    // Check if no emails left
+                    const remainingEmails = document.querySelectorAll('.email-row');
+                    if (remainingEmails.length === 0) {
+                        location.reload();
+                    }
+                } else {
+                    showToast('Failed to delete emails: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(error => {
+                showToast('Error deleting emails', 'error');
+            });
+        }
+    });
+    
+    // Refresh functionality
+    document.getElementById('refreshBtn').addEventListener('click', function() {
+        const icon = this.querySelector('i');
+        icon.classList.add('fa-spin');
+        
+        fetch('/api/refresh-sent-emails', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            icon.classList.remove('fa-spin');
+            if (data.success) {
+                showToast('Sent emails refreshed', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showToast('Failed to refresh sent emails', 'error');
+            }
+        })
+        .catch(error => {
+            icon.classList.remove('fa-spin');
+            showToast('Error refreshing sent emails', 'error');
+        });
+    });
+});
+
+function viewEmail(emailId) {
+    window.location.href = "{{ url_for('main.view_sent_email', email_id=0) }}".replace('0', emailId);
+}
+
+function resendEmail(emailId) {
+    if (confirm('Are you sure you want to resend this email?')) {
+        fetch(`/api/resend-sent-email/${emailId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Email resent successfully', 'success');
+            } else {
+                showToast('Failed to resend email: ' + (data.error || 'Unknown error'), 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error resending email', 'error');
+        });
+    }
+}
+
+function deleteEmail(emailId) {
+    if (confirm('Are you sure you want to delete this sent email?')) {
+        fetch(`/api/delete-sent-email/${emailId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.querySelector(`[data-email-id="${emailId}"]`).remove();
+                showToast('Email deleted successfully', 'success');
+                
+                // Check if no emails left
+                const remainingEmails = document.querySelectorAll('.email-row');
+                if (remainingEmails.length === 0) {
+                    location.reload();
+                }
+            } else {
+                showToast('Failed to delete email: ' + (data.error || 'Unknown error'), 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error deleting email', 'error');
+        });
+    }
+}
+</script>
+{% endblock %}

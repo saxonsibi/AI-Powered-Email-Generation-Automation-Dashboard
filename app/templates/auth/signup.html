@@ -1,0 +1,193 @@
+<!-- app/templates/auth/signup.html -->
+{% extends "base.html" %}
+
+{% block title %}Sign Up - AI Email Dashboard{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-full px-4 py-12 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md space-y-8 glass rounded-xl p-8">
+        <div class="text-center">
+            <div class="mx-auto h-16 w-16 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                <i class="fas fa-robot text-2xl text-indigo-600 dark:text-indigo-400"></i>
+            </div>
+            <h2 class="mt-6 text-3xl font-bold text-gray-900 dark:text-white">Create your account</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Or
+                <a href="{{ url_for('auth.login') }}" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">sign in to your existing account</a>
+            </p>
+        </div>
+        
+        <form class="mt-8 space-y-6" action="{{ url_for('auth.signup') }}" method="POST">
+            <div class="space-y-4">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
+                    <div class="mt-1">
+                        <input id="username" name="username" type="text" autocomplete="username" required 
+                               class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                               placeholder="Choose a username">
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email address</label>
+                    <div class="mt-1">
+                        <input id="email" name="email" type="email" autocomplete="email" required 
+                               class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                               placeholder="your@email.com">
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+                    <div class="mt-1">
+                        <input id="password" name="password" type="password" autocomplete="new-password" required 
+                               class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                               placeholder="Create a password">
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="confirm_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirm Password</label>
+                    <div class="mt-1">
+                        <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required 
+                               class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                               placeholder="Confirm your password">
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Sign up
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // GSAP animations
+    gsap.from(".glass", {
+        duration: 1,
+        y: 50,
+        opacity: 0,
+        ease: "power3.out"
+    });
+    
+    gsap.from("h2", {
+        duration: 1,
+        y: -20,
+        opacity: 0,
+        delay: 0.3,
+        ease: "power3.out"
+    });
+    
+    gsap.from("form", {
+        duration: 1,
+        y: 20,
+        opacity: 0,
+        delay: 0.5,
+        ease: "power3.out"
+    });
+    
+    // Real-time validation
+    const usernameInput = document.getElementById('username');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+    
+    // Check username availability
+    usernameInput.addEventListener('blur', function() {
+        if (this.value.trim()) {
+            fetch('/api/check-username', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username: this.value })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.exists) {
+                    this.classList.add('border-red-500');
+                    showFieldError(this, 'Username already exists');
+                } else {
+                    this.classList.remove('border-red-500');
+                    removeFieldError(this);
+                }
+            })
+            .catch(error => {
+                console.error('Error checking username:', error);
+            });
+        }
+    });
+    
+    // Check email availability
+    emailInput.addEventListener('blur', function() {
+        if (this.value.trim() && isValidEmail(this.value)) {
+            fetch('/api/check-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: this.value })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.exists) {
+                    this.classList.add('border-red-500');
+                    showFieldError(this, 'Email already exists');
+                } else {
+                    this.classList.remove('border-red-500');
+                    removeFieldError(this);
+                }
+            })
+            .catch(error => {
+                console.error('Error checking email:', error);
+            });
+        }
+    });
+    
+    // Password confirmation validation
+    confirmPasswordInput.addEventListener('input', function() {
+        if (this.value !== passwordInput.value) {
+            this.classList.add('border-red-500');
+            showFieldError(this, 'Passwords do not match');
+        } else {
+            this.classList.remove('border-red-500');
+            removeFieldError(this);
+        }
+    });
+    
+    function showFieldError(field, message) {
+        removeFieldError(field); // Remove any existing error
+        
+        field.classList.add('border-red-500');
+        
+        const errorElement = document.createElement('p');
+        errorElement.className = 'mt-1 text-sm text-red-600 dark:text-red-400';
+        errorElement.textContent = message;
+        errorElement.id = field.id + '-error';
+        
+        field.parentNode.appendChild(errorElement);
+    }
+    
+    function removeFieldError(field) {
+        field.classList.remove('border-red-500');
+        
+        const errorElement = document.getElementById(field.id + '-error');
+        if (errorElement) {
+            errorElement.remove();
+        }
+    }
+    
+    function isValidEmail(email) {
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return re.test(email);
+    }
+});
+</script>
+{% endblock %}

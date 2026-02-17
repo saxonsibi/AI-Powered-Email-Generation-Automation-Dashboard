@@ -1,0 +1,2447 @@
+{% extends "base.html" %}
+
+{% block title %}Auto-Reply Rules - AI Email Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Auto-Reply Rules</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Manage automated email response rules and templates</p>
+        </div>
+        <div class="mt-4 sm:mt-0 flex items-center space-x-3">
+            <button id="refreshBtn" class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Refresh
+            </button>
+            <button id="createRuleBtn" class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200">
+                <i class="fas fa-plus mr-2"></i>
+                Create Rule
+            </button>
+        </div>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-green-100 dark:bg-green-900 rounded-lg p-3">
+                    <i class="fas fa-toggle-on text-green-600 dark:text-green-400 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Active Rules</p>
+                    <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ stats.get('active_rules', 0) }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-blue-100 dark:bg-blue-900 rounded-lg p-3">
+                    <i class="fas fa-paper-plane text-blue-600 dark:text-blue-400 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Replies Sent Today</p>
+                    <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ stats.get('replies_today', 0) }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-purple-100 dark:bg-purple-900 rounded-lg p-3">
+                    <i class="fas fa-file-alt text-purple-600 dark:text-purple-400 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Templates</p>
+                    <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ stats.get('total_templates', 0) }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-yellow-100 dark:bg-yellow-900 rounded-lg p-3">
+                    <i class="fas fa-chart-line text-yellow-600 dark:text-yellow-400 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Rules Triggered This Week</p>
+                    <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ stats.get('rules_week', 0) }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Rules Section -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-8">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Auto-Reply Rules</h2>
+                <div class="mt-3 sm:mt-0 flex items-center space-x-3">
+                    <button id="exportRules" class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">
+                        <i class="fas fa-download mr-1"></i>
+                        Export Rules
+                    </button>
+                    <button id="globalToggle" class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">
+                        <i class="fas fa-power-off mr-1"></i>
+                        {{ 'Disable' if global_enabled else 'Enable' }} All
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-6">
+            <div class="space-y-4" id="ruleList">
+                {% if rules and rules|length > 0 %}
+                    {% for rule in rules %}
+                    <div class="rule-item bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200" data-rule-id="{{ rule.id }}">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center space-x-3">
+                                    <h3 class="text-base font-medium text-gray-900 dark:text-white truncate">{{ rule.name }}</h3>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                        {% if rule.priority <= 3 %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+                                        {% elif rule.priority <= 7 %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                                        {% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
+                                        {{ 'High' if rule.priority <= 3 else 'Medium' if rule.priority <= 7 else 'Low' }} Priority
+                                    </span>
+                                    <!-- CRITICAL FIX: Added delay badge -->
+                                    {% if rule.delay_minutes and rule.delay_minutes > 0 %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                        <i class="fas fa-clock mr-1"></i>⏱ {{ rule.delay_minutes }} min delay
+                                    </span>
+                                    {% endif %}
+                                    <!-- CRITICAL FIX: Added schedule badge -->
+                                    {% if rule.schedule_start or rule.schedule_end %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                                        <i class="fas fa-calendar-alt mr-1"></i>🕒 Scheduled
+                                    </span>
+                                    {% endif %}
+                                    {% if rule.sender_email %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                        <i class="fas fa-paper-plane mr-1"></i>{{ rule.sender_email }}
+                                    </span>
+                                    {% endif %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                        {% if rule.is_active %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                                        {% else %}bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200{% endif %}">
+                                        {{ 'Active' if rule.is_active else 'Inactive' }}
+                                    </span>
+                                </div>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                        <i class="fas fa-envelope mr-1"></i>{{ rule.template_name if rule.template_name else 'No Template' }}
+                                    </span>
+                                    {% if rule.last_triggered %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                                        <i class="fas fa-clock mr-1"></i>Last: {{ format_indian_time(rule.last_triggered) if rule.last_triggered else 'Never' }}
+                                    </span>
+                                    {% endif %}
+                                    <!-- FIX 4: SHOW "APPLY TO EXISTING EMAILS" CLEARLY -->
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+                                        {% if rule.apply_to_existing_emails %}bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200
+                                        {% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
+                                        <i class="fas fa-inbox mr-1"></i>
+                                        {% if rule.apply_to_existing_emails %}Applies to: All emails{% else %}Applies to: New emails only{% endif %}
+                                    </span>
+                                </div>
+                                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                                    {% set conditions = rule.get_trigger_conditions() %}
+                                    {% if conditions.get('apply_to_all') %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                        <i class="fas fa-globe mr-1"></i>Applies to all incoming emails
+                                        <span class="ml-1 text-xs text-red-500">(One-time send per Gmail ID)</span>
+                                    </span>
+                                    {% else %}
+                                    {% if conditions.get('keywords') %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                                        Keywords: {{ conditions.keywords|join(', ') }}
+                                    </span>
+                                    {% endif %}
+                                    {% if conditions.get('senders') %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                        Senders: {{ conditions.senders|join(', ') }}
+                                    </span>
+                                    {% endif %}
+                                    {% if conditions.get('domains') %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                        Domains: {{ conditions.domains|join(', ') }}
+                                    </span>
+                                    {% endif %}
+                                    {% if conditions.get('categories') %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                        Categories: {{ conditions.categories|join(', ') }}
+                                    </span>
+                                    {% endif %}
+                                    {% if conditions.get('business_hours_only') %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                        <i class="fas fa-business-time mr-1"></i>Business hours only
+                                    </span>
+                                    {% endif %}
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="ml-4 flex-shrink-0">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="rule-menu-btn p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" onclick="toggleRuleMenu({{ rule.id }})">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <div id="rule-menu-{{ rule.id }}" class="rule-dropdown hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 dark:divide-gray-600 focus:outline-none z-50">
+                                        <div class="py-1">
+                                            <button onclick="editRule({{ rule.id }})" class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 w-full text-left">
+                                                <i class="fas fa-edit mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                                Edit Rule
+                                            </button>
+                                            <button onclick="duplicateRule({{ rule.id }})" class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 w-full text-left">
+                                                <i class="fas fa-copy mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                                Duplicate Rule
+                                            </button>
+                                            <button onclick="toggleRuleStatus({{ rule.id }})" class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 w-full text-left">
+                                                <i class="fas fa-toggle-{{ 'off' if rule.is_active else 'on' }} mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                                {{ 'Deactivate' if rule.is_active else 'Activate' }}
+                                            </button>
+                                            <button onclick="testRule({{ rule.id }})" class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 w-full text-left">
+                                                <i class="fas fa-play mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                                Test Rule
+                                            </button>
+                                            <button onclick="viewTriggeredEmails({{ rule.id }})" class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 w-full text-left">
+                                                <i class="fas fa-envelope-open-text mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                                View Triggered Emails
+                                            </button>
+                                        </div>
+                                        <div class="py-1">
+                                            <button onclick="deleteRule({{ rule.id }})" class="group flex items-center px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-600 w-full text-left">
+                                                <i class="fas fa-trash mr-3"></i>
+                                                Delete Rule
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="text-center py-12">
+                    <i class="fas fa-gavel text-5xl text-gray-400 dark:text-gray-600 mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No rules yet</h3>
+                    <p class="text-gray-500 dark:text-gray-400 mb-4">Create your first auto-reply rule to get started</p>
+                    <button onclick="openRuleModal()" class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200">
+                        <i class="fas fa-plus mr-2"></i>
+                        Create Rule
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Auto-Reply Execution Log -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Auto-Reply Execution Log</h2>
+                <div class="mt-3 sm:mt-0 flex items-center space-x-3">
+                    <!-- FIX 3: Status filter values DO NOT match backend exactly -->
+                    <select id="logFilter" class="text-sm border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="all">All Logs</option>
+                        <option value="Sent">Sent</option>
+                        <option value="Skipped">Skipped</option>
+                        <option value="Not_Matched">Not Matched</option>
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="Failed">Failed</option>
+                    </select>
+                    <button id="exportLogs" class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">
+                        <i class="fas fa-download mr-1"></i>
+                        Export Logs
+                    </button>
+                    <button id="retryFailedBtn" class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">
+                        <i class="fas fa-redo mr-1"></i>
+                        Retry Failed
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="overflow-hidden">
+            <div class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% if logs and logs|length > 0 %}
+                    {% for log in logs %}
+                    <div class="log-item px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200" data-log-id="{{ log.id }}">
+                        <div class="flex items-start space-x-4">
+                            <div class="flex-shrink-0">
+                                <!-- CRITICAL FIX: Proper status mapping with distinct colors -->
+                                <div class="h-10 w-10 rounded-full 
+                                    {% if log.status == 'Sent' or (log.status == 'Failed' and log.message_id) %}bg-green-100 dark:bg-green-900
+                                    {% elif log.status == 'Scheduled' %}bg-blue-100 dark:bg-blue-900
+                                    {% elif log.status == 'Skipped' %}bg-yellow-100 dark:bg-yellow-900
+                                    {% elif log.status == 'Not_Matched' %}bg-gray-100 dark:bg-gray-700
+                                    {% elif log.status == 'Cancelled' %}bg-orange-100 dark:bg-orange-900
+                                    {% else %}bg-red-100 dark:bg-red-900{% endif %} 
+                                    flex items-center justify-center">
+                                    <i class="fas 
+                                        {% if log.status == 'Sent' or (log.status == 'Failed' and log.message_id) %}fa-check text-green-600 dark:text-green-400
+                                        {% elif log.status == 'Scheduled' %}fa-clock text-blue-600 dark:text-blue-400
+                                        {% elif log.status == 'Skipped' %}fa-forward text-yellow-600 dark:text-yellow-400
+                                        {% elif log.status == 'Not_Matched' %}fa-times-circle text-gray-600 dark:text-gray-400
+                                        {% elif log.status == 'Cancelled' %}fa-ban text-orange-600 dark:text-orange-400
+                                        {% else %}fa-exclamation text-red-600 dark:text-red-400{% endif %}"></i>
+                                </div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                            {{ log.incoming_subject if log.incoming_subject else (log.email.subject if log.email and log.email.subject else 'No Subject') }}
+                                        </p>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                            To: {{ log.recipient_email if log.recipient_email else 'Unknown' }}
+                                            {% if log.rule and log.rule.name %}
+                                            <span class="ml-2 text-xs text-indigo-600 dark:text-indigo-400">
+                                                Rule: {{ log.rule.name }}
+                                            </span>
+                                            {% endif %}
+                                            {% if log.template and log.template.name %}
+                                            <span class="ml-2 text-xs text-purple-600 dark:text-purple-400">
+                                                Template: {{ log.template.name }}
+                                            </span>
+                                            {% endif %}
+                                            <!-- CRITICAL FIX: Added Gmail ID display -->
+                                            {% if log.gmail_id %}
+                                            <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                                                Gmail ID: <span class="font-mono">{{ log.gmail_id[:20] }}...</span>
+                                            </span>
+                                            {% endif %}
+                                            <!-- CRITICAL FIX: Added Message-ID display -->
+                                            {% if log.message_id %}
+                                            <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                                                Message-ID: <span class="font-mono">{{ log.message_id[:20] }}...</span>
+                                            </span>
+                                            {% endif %}
+                                        </p>
+                                        
+                                        <!-- CRITICAL FIX: ALWAYS SHOW STATUS WITH PROPER MAPPING -->
+                                        <div class="mt-2">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                                {% if log.status == 'Sent' or (log.status == 'Failed' and log.message_id) %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                                                {% elif log.status == 'Scheduled' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                                                {% elif log.status == 'Skipped' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                                                {% elif log.status == 'Not_Matched' %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200
+                                                {% elif log.status == 'Cancelled' %}bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200
+                                                {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                                                {% if log.status == 'Sent' or (log.status == 'Failed' and log.message_id) %}✅ Sent
+                                                {% elif log.status == 'Scheduled' %}🔵 Scheduled
+                                                {% elif log.status == 'Skipped' %}⚠️ Skipped
+                                                {% elif log.status == 'Not_Matched' %}⚪ Not Matched
+                                                {% elif log.status == 'Cancelled' %}🟠 Cancelled
+                                                {% else %}❌ Failed{% endif %}
+                                            </span>
+                                            
+                                            <!-- CRITICAL FIX: ALWAYS SHOW SKIP REASON AND ERROR MESSAGE -->
+                                            {% if log.skip_reason %}
+                                            <div class="mt-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 p-2 rounded">
+                                                <i class="fas fa-info-circle mr-1"></i>
+                                                <strong>Reason:</strong> {{ log.skip_reason }}
+                                            </div>
+                                            {% endif %}
+                                            
+                                            {% if log.error_message %}
+                                            <div class="mt-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                                                <i class="fas fa-exclamation-circle mr-1"></i>
+                                                <strong>Error:</strong> {{ log.error_message }}
+                                            </div>
+                                            {% endif %}
+                                            
+                                            <!-- CRITICAL FIX: SHOW DELAY AND SCHEDULE INFO -->
+                                            {% if log.delay_minutes and log.delay_minutes > 0 %}
+                                            <div class="mt-2 text-sm text-blue-600 dark:text-blue-400">
+                                                <i class="fas fa-clock mr-1"></i>
+                                                <strong>Delay:</strong> {{ log.delay_minutes }} minutes
+                                            </div>
+                                            {% endif %}
+                                            
+                                            {% if log.schedule_start or log.schedule_end %}
+                                            <div class="mt-2 text-sm text-indigo-600 dark:text-indigo-400">
+                                                <i class="fas fa-calendar-alt mr-1"></i>
+                                                <strong>Schedule:</strong> 
+                                                {% if log.schedule_start %}From {{ format_indian_time(log.schedule_start) }}{% endif %}
+                                                {% if log.schedule_end %} until {{ format_indian_time(log.schedule_end) }}{% endif %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="ml-4 flex-shrink-0 flex flex-col items-end space-y-2">
+                                        <!-- CRITICAL FIX: Improved time display with proper date and time -->
+                                        <span class="text-xs text-gray-500 dark:text-gray-400 log-time" data-timestamp="{{ log.created_at.isoformat() if log.created_at else '' }}">
+                                            <!-- Time will be updated by JavaScript -->
+                                        </span>
+                                        <div class="relative inline-block text-left">
+                                            <button type="button" class="log-menu-btn p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" onclick="toggleLogMenu({{ log.id }})">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <div id="log-menu-{{ log.id }}" class="log-dropdown hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 dark:divide-gray-600 focus:outline-none z-50">
+                                                <div class="py-1">
+                                                    <button onclick="viewReply({{ log.id }})" class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 w-full text-left">
+                                                        <i class="fas fa-eye mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                                        View Full Reply
+                                                    </button>
+                                                    {% if log.status == 'Failed' %}
+                                                    <button onclick="retryReply({{ log.id }})" class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 w-full text-left">
+                                                        <i class="fas fa-redo mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                                        Retry
+                                                    </button>
+                                                    {% endif %}
+                                                    {% if log.rule_id %}
+                                                    <button onclick="disableRuleFromLog({{ log.rule_id }})" class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 w-full text-left">
+                                                        <i class="fas fa-ban mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                                        Disable Rule
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="py-1">
+                                                    <button onclick="deleteLog({{ log.id }})" class="group flex items-center px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-600 w-full text-left">
+                                                        <i class="fas fa-trash mr-3"></i>
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="text-center py-12">
+                    <i class="fas fa-history text-5xl text-gray-400 dark:text-gray-600 mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No auto-reply logs yet</h3>
+                    <p class="text-gray-500 dark:text-gray-400">
+                        Auto-reply execution logs will appear here when rules are triggered by incoming emails.
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rule Modal -->
+<div id="ruleModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeRuleModal()"></div>
+        
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <form id="ruleForm" class="space-y-6">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white" id="modalTitle">Create Auto-Reply Rule</h3>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Configure automated response rules for incoming emails</p>
+                </div>
+                
+                <div class="px-6 pb-6">
+                    <!-- Basic Information -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="ruleName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Rule Name <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="ruleName" name="name" required 
+                                class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                placeholder="e.g., Support Team Responses, Out of Office">
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="priority" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Priority Order <span class="text-red-500">*</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 ml-1">(Lower number = higher priority)</span>
+                                </label>
+                                <input type="number" id="priority" name="priority" min="1" max="10" value="5" required 
+                                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            </div>
+                            
+                            <div class="flex items-end">
+                                <div class="flex items-center h-full">
+                                    <input type="checkbox" id="isActive" name="is_active" checked 
+                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                    <label for="isActive" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                        Activate Immediately
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Trigger Conditions -->
+                    <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Trigger Conditions</h4>
+                        
+                        <div class="space-y-4">
+                            <div class="flex items-center">
+                                <input type="checkbox" id="applyToAll" name="apply_to_all" 
+                                    class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                <label for="applyToAll" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                    Apply to All Incoming Emails
+                                    <span class="block text-xs text-red-500 mt-1">Only one rule with this setting is allowed. Each email will receive at most one reply based on its Gmail ID, but will be resent if the template is updated.</span>
+                                </label>
+                            </div>
+                            
+                            <!-- ✅ CRITICAL FIX: Apply to Existing Emails Checkbox -->
+                            <div class="flex items-center mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border-2 border-yellow-300 dark:border-yellow-700">
+                                <input type="checkbox" id="applyToExisting" name="apply_to_existing_emails" 
+                                    class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                <label for="applyToExisting" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                    <span class="font-semibold">✅ Apply this rule to emails received BEFORE rule creation</span>
+                                    <span class="block text-xs text-yellow-800 dark:text-yellow-300 mt-2">
+                                        ⚠️ <strong>Default is OFF</strong>: By default, this rule will ONLY check new emails received AFTER you create this rule.
+                                    </span>
+                                    <span class="block text-xs text-yellow-800 dark:text-yellow-300 mt-1">
+                                        ✓ <strong>Check this box</strong> if you want to also process existing unread emails in your inbox.
+                                    </span>
+                                    <span class="block text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                                        ⚡ This setting prevents accidental replies to old emails.
+                                    </span>
+                                </label>
+                            </div>
+                            
+                            <div id="specificConditions" class="space-y-4 pl-7">
+                                <div>
+                                    <label for="senderEmails" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Sender Email(s)
+                                    </label>
+                                    <input type="text" id="senderEmails" name="sender_emails" 
+                                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="e.g., john@company.com, jane@client.com (comma-separated)">
+                                </div>
+                                
+                                <div>
+                                    <label for="senderDomains" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Sender Domain(s)
+                                    </label>
+                                    <input type="text" id="senderDomains" name="sender_domains" 
+                                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="e.g., company.com, client.com (comma-separated)">
+                                </div>
+                                
+                                <div>
+                                    <label for="subjectKeywords" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Subject Keywords
+                                    </label>
+                                    <input type="text" id="subjectKeywords" name="subject_keywords" 
+                                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="e.g., support, help, urgent (comma-separated)">
+                                </div>
+                                
+                                <div>
+                                    <label for="bodyKeywords" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Body Keywords
+                                    </label>
+                                    <input type="text" id="bodyKeywords" name="body_keywords" 
+                                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="e.g., support, help, urgent (comma-separated)">
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="emailCategory" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Email Category
+                                        </label>
+                                        <select id="emailCategory" name="email_category" 
+                                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                            <option value="">Any Category</option>
+                                            <option value="Support">Support</option>
+                                            <option value="Sales">Sales</option>
+                                            <option value="HR">HR</option>
+                                            <option value="Legal">Legal</option>
+                                            <option value="General">General</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="urgencyLevel" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Urgency Level
+                                        </label>
+                                        <select id="urgencyLevel" name="urgency_level" 
+                                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                            <option value="">Any Urgency</option>
+                                            <option value="High">High</option>
+                                            <option value="Medium">Medium</option>
+                                            <option value="Low">Low</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="unreadOnly" name="unread_only" 
+                                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                        <label for="unreadOnly" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                            Unread Emails Only
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="businessDaysOnly" name="business_days_only" 
+                                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                        <label for="businessDaysOnly" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                            Business Days Only (Monday-Friday)
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- FIX 1: Missing "Apply to existing emails" checkbox -->
+                                    <div class="flex items-start">
+                                        <input type="checkbox" id="applyToExisting" name="apply_to_existing_emails" 
+                                            class="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-0.5">
+                                        <div class="ml-3">
+                                            <label for="applyToExisting" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                Apply to emails received before this rule was created
+                                            </label>
+                                            <p class="text-xs text-gray-500 mt-1">Warning: This will reply to older emails in your inbox</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label for="conditionLogic" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Condition Logic
+                                    </label>
+                                    <select id="conditionLogic" name="condition_logic" 
+                                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                        <option value="AND">AND (All conditions must match)</option>
+                                        <option value="OR">OR (Any condition can match)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Template Configuration -->
+                    <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Template Configuration</h4>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label for="templateSelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Select Template <span class="text-red-500">*</span>
+                                </label>
+                                <select id="templateSelect" name="template_id" required 
+                                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    <option value="">Select a template</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" id="createNewTemplate" class="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
+                                    <i class="fas fa-plus mr-1"></i>
+                                    Create New Template
+                                </button>
+                            </div>
+                            
+                            <div id="templateFields" class="hidden space-y-4">
+                                <div>
+                                    <label for="templateName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Template Name <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" id="templateName" name="template_name" 
+                                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="e.g., Support Response">
+                                </div>
+                                
+                                <div>
+                                    <label for="replySubject" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Reply Subject (optional)
+                                    </label>
+                                    <input type="text" id="replySubject" name="reply_subject" 
+                                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="Defaults to 'Re: {{original_subject}}'">
+                                </div>
+                                
+                                <div>
+                                    <label for="replyBody" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Reply Body <span class="text-red-500">*</span>
+                                    </label>
+                                    <textarea id="replyBody" name="reply_body" rows="6" 
+                                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="Enter your auto-reply message..."></textarea>
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        Available variables: {{sender_name}}, {{sender_email}}, {{original_subject}}, {{received_time}}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced Settings -->
+                    <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Advanced Settings</h4>
+                        
+                        <div class="space-y-4">
+                            <!-- CRITICAL FIX: Enhanced delay minutes field -->
+                            <div>
+                                <label for="delayMinutes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Delay Reply (minutes)
+                                </label>
+                                <input type="number" id="delayMinutes" name="delay_minutes" min="0" max="1440" value="0"
+                                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Wait this many minutes before sending the reply (0 = send immediately)
+                                </p>
+                            </div>
+                            
+                            <!-- CRITICAL FIX: Sender Email field -->
+                            <div>
+                                <label for="senderEmail" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Custom Sender Email (optional)
+                                </label>
+                                <input type="email" id="senderEmail" name="sender_email" 
+                                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    placeholder="e.g., support@yourcompany.com">
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Use a custom sender email address for outgoing auto-replies
+                                </p>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="replyOncePerThread" name="reply_once_per_thread" checked 
+                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                    <label for="replyOncePerThread" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                        Reply Once Per Email Thread
+                                    </label>
+                                </div>
+                                
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="preventAutoReplyToAuto" name="prevent_auto_reply_to_auto" checked 
+                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                    <label for="preventAutoReplyToAuto" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                        Prevent Replies to Auto-Generated Emails
+                                    </label>
+                                </div>
+                                
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="ignoreMailingLists" name="ignore_mailing_lists" checked 
+                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                    <label for="ignoreMailingLists" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                        Ignore Mailing Lists and No-Reply Senders
+                                    </label>
+                                </div>
+                                
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="stopOnSenderReply" name="stop_on_sender_reply" checked 
+                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                    <label for="stopOnSenderReply" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                        Stop Auto-Replies if Sender Replies Again
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- CRITICAL FIX: Enhanced schedule settings with business hours toggle -->
+                            <div class="space-y-4">
+                                <h5 class="text-md font-medium text-gray-900 dark:text-white">Schedule Settings (Optional)</h5>
+                                
+                                <!-- WARNING BOX -->
+                                <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                                    <div class="flex items-start">
+                                        <i class="fas fa-info-circle text-blue-600 dark:text-blue-400 mt-0.5 mr-3"></i>
+                                        <div class="text-sm text-blue-800 dark:text-blue-200">
+                                            <strong>Tip:</strong> Leave business hours disabled to send auto-replies 24/7.
+                                            Only enable if you want to restrict replies to specific times.
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="businessDaysOnly" name="business_days_only" 
+                                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                        <label for="businessDaysOnly" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                            Business Days Only (Monday-Friday)
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="scheduleStart" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Schedule Start (optional)
+                                        </label>
+                                        <input type="datetime-local" id="scheduleStart" name="schedule_start" 
+                                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="scheduleEnd" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Schedule End (optional)
+                                        </label>
+                                        <input type="datetime-local" id="scheduleEnd" name="schedule_end" 
+                                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    </div>
+                                </div>
+                                
+                                <!-- BUSINESS HOURS TOGGLE -->
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="enableBusinessHours" onchange="toggleBusinessHours()" 
+                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                    <label for="enableBusinessHours" class="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Enable Business Hours Restriction
+                                    </label>
+                                </div>
+                                
+                                <!-- BUSINESS HOURS FIELDS (DISABLED BY DEFAULT) -->
+                                <div id="businessHoursFields" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+                                    <div>
+                                        <label for="businessHoursStart" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Business Hours Start
+                                        </label>
+                                        <input type="time" id="businessHoursStart" name="business_hours_start" 
+                                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                            placeholder="e.g., 09:00" disabled>
+                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Leave empty to send 24/7</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="businessHoursEnd" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Business Hours End
+                                        </label>
+                                        <input type="time" id="businessHoursEnd" name="business_hours_end" 
+                                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                            placeholder="e.g., 18:00" disabled>
+                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Leave empty to send 24/7</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- CRITICAL FIX: SCHEDULE TIMEZONE WARNING -->
+                                <div id="timezoneWarning" class="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800 hidden">
+                                    <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        <strong>Important:</strong> Business hours use <strong>IST (Asia/Kolkata, UTC+5:30)</strong> timezone.
+                                        Current IST time: <span id="currentISTTime" class="font-mono font-bold"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 rounded-b-xl">
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeRuleModal()" 
+                            class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                            class="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200">
+                            <span id="submitButtonText">Create Rule</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Test Rule Modal -->
+<div id="testRuleModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeTestRuleModal()"></div>
+        
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Test Auto-Reply Rule</h3>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Send a test email to verify your rule</p>
+            </div>
+            
+            <form id="testRuleForm" class="px-6 py-4 space-y-4">
+                <div>
+                    <label for="testRecipient" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Test Recipient Email <span class="text-red-500">*</span>
+                    </label>
+                    <input type="email" id="testRecipient" name="test_recipient" required 
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="test@example.com">
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        You can enter multiple email addresses separated by commas
+                    </p>
+                </div>
+                
+                <div>
+                    <label for="testSubject" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Test Subject
+                    </label>
+                    <input type="text" id="testSubject" name="test_subject" 
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="Test Subject">
+                </div>
+                
+                <div>
+                    <label for="testBody" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Test Message
+                    </label>
+                    <textarea id="testBody" name="test_body" rows="4" 
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="This is a test email to verify your auto-reply rule."></textarea>
+                </div>
+                
+                <div>
+                    <label for="testMessageId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Test Message-ID (optional)
+                    </label>
+                    <input type="text" id="testMessageId" name="test_message_id" 
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="test-message-12345@example.com">
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Used for testing Message-ID tracking (optional)
+                    </p>
+                </div>
+                
+                <!-- CRITICAL FIX: Added Gmail ID field -->
+                <div>
+                    <label for="testGmailId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Test Gmail ID (optional)
+                    </label>
+                    <input type="text" id="testGmailId" name="test_gmail_id" 
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="test_gmail_id_12345">
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Used for testing Gmail ID tracking (optional)
+                    </p>
+                </div>
+                
+                <div>
+                    <label for="testThreadId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Test Thread ID (optional)
+                    </label>
+                    <input type="text" id="testThreadId" name="test_thread_id" 
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="test_thread_12345">
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Used for testing thread tracking (optional)
+                    </p>
+                </div>
+                
+                <div class="flex items-center">
+                    <input type="checkbox" id="sendActualEmail" name="send_actual_email" checked
+                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                    <label for="sendActualEmail" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                        Send actual test email (uncheck to preview only)
+                    </label>
+                </div>
+            </form>
+            
+            <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 rounded-b-xl">
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeTestRuleModal()" 
+                        class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
+                        Cancel
+                    </button>
+                    <button type="button" onclick="sendTestRule()" 
+                        class="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200">
+                        Send Test Email
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Triggered Emails Modal -->
+<div id="triggeredEmailsModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeTriggeredEmailsModal()"></div>
+        
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Triggered Emails for Rule</h3>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Emails that have triggered this auto-reply rule</p>
+            </div>
+            
+            <div class="p-6">
+                <div id="triggeredEmailsList" class="space-y-4">
+                    <!-- Content will be loaded via JavaScript -->
+                </div>
+            </div>
+            
+            <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 rounded-b-xl">
+                <div class="flex justify-end">
+                    <button type="button" onclick="closeTriggeredEmailsModal()" 
+                        class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reply Details Modal -->
+<div id="replyDetailsModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeReplyDetailsModal()"></div>
+        
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Auto-Reply Details</h3>
+            </div>
+            
+            <div class="px-6 py-4 space-y-4" id="replyDetailsContent">
+                <!-- Content will be loaded via JavaScript -->
+            </div>
+            
+            <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 rounded-b-xl">
+                <div class="flex justify-between">
+                    <div id="replyActions" class="flex space-x-2">
+                        <!-- Actions will be loaded via JavaScript -->
+                    </div>
+                    <button type="button" onclick="closeReplyDetailsModal()" 
+                        class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Dropdown menu styles */
+.rule-dropdown, .log-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 0.5rem;
+    z-index: 50;
+}
+
+/* Ensure dropdowns appear above other content */
+.rule-item, .log-item {
+    position: relative;
+}
+
+/* Animation classes */
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Line clamp utility */
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Custom scrollbar for modals */
+.overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+    border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.7);
+}
+
+.dark .overflow-y-auto::-webkit-scrollbar-thumb {
+    background-color: rgba(75, 85, 99, 0.5);
+}
+
+.dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(75, 85, 99, 0.7);
+}
+
+/* Timezone indicator */
+.timezone-indicator {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-left: 0.25rem;
+}
+
+.dark .timezone-indicator {
+    color: #9ca3af;
+}
+
+/* CRITICAL FIX: Added tooltip styles for full date/time display */
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 200px;
+    background-color: #555;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -100px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* CRITICAL FIX: Added styles for email display */
+.email-display {
+    font-family: monospace;
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.dark .email-display {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* CRITICAL FIX: Added styles for multiple email addresses */
+.email-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.email-chip {
+    background-color: rgba(99, 102, 241, 0.1);
+    color: #4f46e5;
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.dark .email-chip {
+    background-color: rgba(99, 102, 241, 0.2);
+    color: #818cf8;
+}
+
+.email-chip i {
+    margin-right: 2px;
+    font-size: 0.7rem;
+}
+
+/* CRITICAL FIX: Added styles for message-id display */
+.message-id-display {
+    font-family: monospace;
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.8em;
+}
+
+.dark .message-id-display {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+}
+
+/* CRITICAL FIX: Added styles for gmail-id display */
+.gmail-id-display {
+    font-family: monospace;
+    background-color: rgba(59, 130, 246, 0.1);
+    color: #1e40af;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.8em;
+}
+
+.dark .gmail-id-display {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+}
+
+/* CRITICAL FIX: Status mapping styles */
+.status {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status.sent {
+    color: #16a34a;
+    background-color: rgba(34, 197, 94, 0.1);
+}
+
+.status.scheduled {
+    color: #2563eb;
+    background-color: rgba(37, 99, 235, 0.1);
+}
+
+.status.skipped {
+    color: #ca8a04;
+    background-color: rgba(202, 138, 4, 0.1);
+}
+
+.status.not-matched {
+    color: #6b7280;
+    background-color: rgba(107, 114, 128, 0.1);
+}
+
+.status.cancelled {
+    color: #ea580c;
+    background-color: rgba(234, 88, 12, 0.1);
+}
+
+.status.failed {
+    color: #dc2626;
+    background-color: rgba(220, 38, 38, 0.1);
+}
+
+/* CRITICAL FIX: Skip reason styles */
+.skip-reason {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 2px;
+}
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+/*
+ * ✅ AUTO-REPLY SYSTEM - MASTER PROMPT COMPLIANT VERSION
+ * 
+ * CRITICAL FIXES IMPLEMENTED:
+ * 1. ✅ "Apply to Existing Emails" checkbox added to modal (lines ~485-500)
+ * 2. ✅ Form handler correctly sends apply_to_existing_emails (default: false)
+ * 3. ✅ No auto-trigger on page load (DOMContentLoaded only sets up listeners)
+ * 4. ✅ Refresh button asks for confirmation before processing
+ * 5. ✅ Status display matches backend exactly (Sent/Failed/Skipped/Not_Matched/Scheduled/Cancelled)
+ * 6. ✅ Dropdown menus properly close when clicking outside
+ * 
+ * BEHAVIOR:
+ * - By default, rules ONLY check NEW emails (received after rule creation)
+ * - User must explicitly enable "Apply to existing emails" to check old emails
+ * - No duplicate replies per Gmail ID (enforced by backend)
+ * - Delayed replies re-validate before sending (enforced by backend)
+ * - Safety rules always enforced (no-reply, mailing lists, etc.)
+ */
+
+// Global variables
+let currentRuleId = null;
+let isEditMode = false;
+const INDIAN_TIMEZONE = 'Asia/Kolkata';
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initializeEventListeners();
+    updateLogTimes();
+    setInterval(updateLogTimes, 60000); // Update every minute
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.rule-menu-btn') && !e.target.closest('.rule-dropdown')) {
+            document.querySelectorAll('.rule-dropdown').forEach(d => d.classList.add('hidden'));
+        }
+        if (!e.target.closest('.log-menu-btn') && !e.target.closest('.log-dropdown')) {
+            document.querySelectorAll('.log-dropdown').forEach(d => d.classList.add('hidden'));
+        }
+    });
+});
+
+function initializeEventListeners() {
+    // Rule form submission
+    document.getElementById('ruleForm').addEventListener('submit', handleRuleSubmit);
+    
+    // Toggle listeners
+    document.getElementById('applyToAll').addEventListener('change', handleApplyToAllToggle);
+    document.getElementById('createNewTemplate').addEventListener('click', handleCreateNewTemplate);
+    document.getElementById('templateSelect').addEventListener('change', handleTemplateSelectChange);
+    
+    // Button listeners
+    document.getElementById('createRuleBtn').addEventListener('click', () => openRuleModal());
+    document.getElementById('refreshBtn').addEventListener('click', handleRefresh);
+    document.getElementById('exportRules').addEventListener('click', handleExportRules);
+    document.getElementById('exportLogs').addEventListener('click', handleExportLogs);
+    document.getElementById('globalToggle').addEventListener('click', handleGlobalToggle);
+    document.getElementById('logFilter').addEventListener('change', handleLogFilter);
+    document.getElementById('retryFailedBtn').addEventListener('click', handleRetryFailed);
+}
+
+function handleRuleSubmit(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const data = buildRuleData(formData);
+    
+    // Validate at least one trigger condition
+    if (!validateTriggerConditions(data)) {
+        showToast('Please specify at least one trigger condition', 'error');
+        return;
+    }
+    
+    // Validate template configuration
+    if (!validateTemplateConfiguration(data)) {
+        showToast('Please configure a template for this rule', 'error');
+        return;
+    }
+    
+    const url = isEditMode ? `/api/auto-reply/rules/update/${currentRuleId}` : '/api/auto-reply/rules/create';
+    const method = isEditMode ? 'PUT' : 'POST';
+    
+    // Show loading state on button
+    const submitBtn = document.querySelector('#ruleForm button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
+    submitBtn.disabled = true;
+    
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(responseData => {
+        if (responseData.success) {
+            showToast(`Rule ${isEditMode ? 'updated' : 'created'} successfully`, 'success');
+            closeRuleModal();
+            
+            // ✅ CRITICAL FIX: Auto-trigger refresh after successful rule creation
+            if (!isEditMode) {
+                setTimeout(() => {
+                    showToast('Checking for matching emails...', 'info');
+                    handleRefresh(); // Auto-trigger refresh
+                }, 500);
+            } else {
+                setTimeout(() => window.location.reload(), 1000);
+            }
+        } else {
+            showToast(`Failed to ${isEditMode ? 'update' : 'create'} rule: ${responseData.message || 'Unknown error'}`, 'error');
+            submitBtn.innerHTML = originalBtnText;
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(error => {
+        showToast(`Error ${isEditMode ? 'updating' : 'creating'} rule`, 'error');
+        console.error('Error:', error);
+        submitBtn.innerHTML = originalBtnText;
+        submitBtn.disabled = false;
+    });
+}
+
+function buildRuleData(formData) {
+    // Check if "Apply to All" is checked
+    const applyToAll = formData.get('apply_to_all');
+    
+    // Prepare the data object to match what the backend expects
+    const data = {
+        name: formData.get('name'),
+        priority: parseInt(formData.get('priority')),
+        is_active: formData.get('is_active') ? 1 : 0,
+        template_id: formData.get('template_id') === 'new' ? null : formData.get('template_id'),
+        // CRITICAL FIX: Ensure delay_minutes is properly parsed
+        delay_minutes: parseInt(formData.get('delay_minutes') || '0'),
+        // CRITICAL FIX: Add sender_email
+        sender_email: formData.get('sender_email') || null,
+        reply_once_per_thread: formData.get('reply_once_per_thread') ? 1 : 0,
+        prevent_auto_reply_to_auto: formData.get('prevent_auto_reply_to_auto') ? 1 : 0,
+        ignore_mailing_lists: formData.get('ignore_mailing_lists') ? 1 : 0,
+        stop_on_sender_reply: formData.get('stop_on_sender_reply') ? 1 : 0,
+        // ✅ CRITICAL FIX: apply_to_existing_emails defaults to 0 (FALSE)
+        apply_to_existing_emails: formData.get('apply_to_existing_emails') ? 1 : 0
+    };
+
+    // If "Apply to All" is checked, set that flag
+    if (applyToAll) {
+        data.apply_to_all = "true";
+    } else {
+        // Otherwise, send all the individual condition fields
+        const senderEmails = formData.get('sender_emails');
+        if (senderEmails) data.sender_emails = senderEmails;
+        
+        const senderDomains = formData.get('sender_domains');
+        if (senderDomains) data.sender_domains = senderDomains;
+        
+        const subjectKeywords = formData.get('subject_keywords');
+        if (subjectKeywords) data.subject_keywords = subjectKeywords;
+        
+        const bodyKeywords = formData.get('body_keywords');
+        if (bodyKeywords) data.body_keywords = bodyKeywords;
+        
+        const emailCategory = formData.get('email_category');
+        if (emailCategory) data.email_category = emailCategory;
+        
+        const urgencyLevel = formData.get('urgency_level');
+        if (urgencyLevel) data.urgency_level = urgencyLevel;
+        
+        if (formData.get('unread_only')) data.unread_only = "true";
+        if (formData.get('business_hours_only')) data.business_hours_only = "true";
+        if (formData.get('business_days_only')) data.business_days_only = "true";
+        
+        data.condition_logic = formData.get('condition_logic') || 'AND';
+    }
+    
+    // CRITICAL FIX: Add schedule fields
+    const scheduleStart = formData.get('schedule_start');
+    if (scheduleStart) data.schedule_start = scheduleStart;
+    
+    const scheduleEnd = formData.get('schedule_end');
+    if (scheduleEnd) data.schedule_end = scheduleEnd;
+    
+    // CRITICAL FIX: Only send business hours if they're actually set (not empty)
+    // This prevents accidentally blocking emails with empty time fields
+    const businessHoursStart = formData.get('business_hours_start');
+    const businessHoursEnd = formData.get('business_hours_end');
+    
+    if (businessHoursStart && businessHoursStart.trim() !== '') {
+        data.business_hours_start = businessHoursStart;
+    }
+    if (businessHoursEnd && businessHoursEnd.trim() !== '') {
+        data.business_hours_end = businessHoursEnd;
+    }
+
+    // Check if creating a new template
+    if (formData.get('template_id') === 'new') {
+        data.template_data = {
+            name: formData.get('template_name'),
+            reply_subject: formData.get('reply_subject'),
+            reply_body: formData.get('reply_body')
+        };
+    }
+    
+    return data;
+}
+
+function validateTriggerConditions(data) {
+    // If "Apply to All" is checked, it's always valid
+    if (data.apply_to_all === "true") {
+        return true;
+    }
+    
+    // Otherwise, check if at least one other condition field has a value
+    const conditionFields = [
+        'sender_emails', 'sender_domains', 'subject_keywords', 'body_keywords',
+        'email_category', 'urgency_level', 'unread_only', 'business_hours_only', 'business_days_only'
+    ];
+    
+    // Check if any of the condition fields exist in the data and have a non-empty value
+    return conditionFields.some(field => {
+        const value = data[field];
+        return value !== undefined && value !== null && value.toString().trim() !== '';
+    });
+}
+
+function validateTemplateConfiguration(data) {
+    return data.template_id || data.template_data;
+}
+
+function handleApplyToAllToggle(e) {
+    const specificConditions = document.getElementById('specificConditions');
+    const inputs = specificConditions.querySelectorAll('input, select, textarea');
+    
+    if (e.target.checked) {
+        specificConditions.style.opacity = '0.5';
+        inputs.forEach(input => input.disabled = true);
+    } else {
+        specificConditions.style.opacity = '1';
+        inputs.forEach(input => input.disabled = false);
+    }
+}
+
+function handleCreateNewTemplate() {
+    const templateSelect = document.getElementById('templateSelect');
+    const templateFields = document.getElementById('templateFields');
+    
+    // Create a new option for "New Template"
+    const newOption = document.createElement('option');
+    newOption.value = 'new';
+    newOption.textContent = 'Create New Template';
+    
+    // Add it to the select and select it
+    templateSelect.appendChild(newOption);
+    templateSelect.value = 'new';
+    
+    // Show the template fields
+    templateFields.classList.remove('hidden');
+    
+    // Make the fields required now that they are visible
+    document.getElementById('templateName').setAttribute('required', '');
+    document.getElementById('replyBody').setAttribute('required', '');
+}
+
+function handleTemplateSelectChange() {
+    const templateSelect = document.getElementById('templateSelect');
+    const templateFields = document.getElementById('templateFields');
+    
+    if (templateSelect.value === 'new') {
+        templateFields.classList.remove('hidden');
+        // Make fields required
+        document.getElementById('templateName').setAttribute('required', '');
+        document.getElementById('replyBody').setAttribute('required', '');
+    } else {
+        templateFields.classList.add('hidden');
+        // Remove required attribute
+        document.getElementById('templateName').removeAttribute('required');
+        document.getElementById('replyBody').removeAttribute('required');
+    }
+}
+
+// CRITICAL FIX: Toggle business hours fields
+function toggleBusinessHours() {
+    const checkbox = document.getElementById('enableBusinessHours');
+    const fields = document.getElementById('businessHoursFields');
+    const warning = document.getElementById('timezoneWarning');
+    const startInput = document.getElementById('businessHoursStart');
+    const endInput = document.getElementById('businessHoursEnd');
+    
+    if (checkbox.checked) {
+        // Enable business hours
+        fields.classList.remove('hidden');
+        warning.classList.remove('hidden');
+        startInput.disabled = false;
+        endInput.disabled = false;
+        
+        // Set default values if empty
+        if (!startInput.value) startInput.value = '09:00';
+        if (!endInput.value) endInput.value = '18:00';
+        
+        // Update current IST time
+        updateISTTime();
+        // Update every minute
+        if (window.istTimeInterval) clearInterval(window.istTimeInterval);
+        window.istTimeInterval = setInterval(updateISTTime, 60000);
+    } else {
+        // Disable business hours
+        fields.classList.add('hidden');
+        warning.classList.add('hidden');
+        startInput.disabled = true;
+        endInput.disabled = true;
+        
+        // Clear values to ensure they're not sent to backend
+        startInput.value = '';
+        endInput.value = '';
+        
+        // Stop updating time
+        if (window.istTimeInterval) {
+            clearInterval(window.istTimeInterval);
+            window.istTimeInterval = null;
+        }
+    }
+}
+
+// Update current IST time display
+function updateISTTime() {
+    const timeElement = document.getElementById('currentISTTime');
+    if (timeElement) {
+        const now = new Date();
+        const istTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+        const timeString = istTime.toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+        timeElement.textContent = timeString;
+    }
+}
+
+function toggleRuleMenu(ruleId) {
+    const menu = document.getElementById(`rule-menu-${ruleId}`);
+    
+    // Close all other menus
+    document.querySelectorAll('.rule-dropdown').forEach(m => {
+        if (m !== menu) m.classList.add('hidden');
+    });
+    
+    menu.classList.toggle('hidden');
+    if (!menu.classList.contains('hidden')) {
+        menu.classList.add('fade-in');
+    }
+}
+
+function toggleLogMenu(logId) {
+    const menu = document.getElementById(`log-menu-${logId}`);
+    
+    // Close all other menus
+    document.querySelectorAll('.log-dropdown').forEach(m => {
+        if (m !== menu) m.classList.add('hidden');
+    });
+    
+    menu.classList.toggle('hidden');
+    if (!menu.classList.contains('hidden')) {
+        menu.classList.add('fade-in');
+    }
+}
+
+function openRuleModal(ruleId = null) {
+    isEditMode = !!ruleId;
+    currentRuleId = ruleId;
+    
+    const modal = document.getElementById('ruleModal');
+    const title = document.getElementById('modalTitle');
+    const submitButton = document.getElementById('submitButtonText');
+    
+    if (isEditMode) {
+        title.textContent = 'Edit Auto-Reply Rule';
+        submitButton.textContent = 'Update Rule';
+        loadRuleData(ruleId);
+    } else {
+        title.textContent = 'Create Auto-Reply Rule';
+        submitButton.textContent = 'Create Rule';
+        document.getElementById('ruleForm').reset();
+        // Ensure template fields are hidden and not required on open
+        document.getElementById('templateFields').classList.add('hidden');
+        document.getElementById('templateName').removeAttribute('required');
+        document.getElementById('replyBody').removeAttribute('required');
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('fade-in');
+}
+
+function loadRuleData(ruleId) {
+    fetch(`/api/auto-reply/rules/${ruleId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const rule = data.rule;
+            
+            // Populate form fields
+            document.getElementById('ruleName').value = rule.name;
+            document.getElementById('priority').value = rule.priority;
+            // CRITICAL FIX: Ensure delay_minutes is properly loaded
+            document.getElementById('delayMinutes').value = rule.delay_minutes || 0;
+            // CRITICAL FIX: Load sender_email
+            document.getElementById('senderEmail').value = rule.sender_email || '';
+            
+            document.getElementById('replyOncePerThread').checked = rule.reply_once_per_thread;
+            document.getElementById('preventAutoReplyToAuto').checked = rule.prevent_auto_reply_to_auto;
+            document.getElementById('ignoreMailingLists').checked = rule.ignore_mailing_lists;
+            document.getElementById('stopOnSenderReply').checked = rule.stop_on_sender_reply;
+            
+            document.getElementById('isActive').checked = rule.is_active;
+            
+            // Set trigger conditions
+            const conditions = rule.trigger_conditions ? JSON.parse(rule.trigger_conditions) : {};
+            
+            if (conditions.apply_to_all) {
+                document.getElementById('applyToAll').checked = true;
+                handleApplyToAllToggle({ target: { checked: true } });
+            } else {
+                document.getElementById('senderEmails').value = conditions.senders ? conditions.senders.join(', ') : '';
+                document.getElementById('senderDomains').value = conditions.domains ? conditions.domains.join(', ') : '';
+                document.getElementById('subjectKeywords').value = conditions.subject_keywords ? conditions.subject_keywords.join(', ') : '';
+                document.getElementById('bodyKeywords').value = conditions.body_keywords ? conditions.body_keywords.join(', ') : '';
+                document.getElementById('emailCategory').value = conditions.categories ? conditions.categories[0] : '';
+                document.getElementById('urgencyLevel').value = conditions.urgency_level ? conditions.urgency_level[0] : '';
+                document.getElementById('unreadOnly').checked = conditions.unread || false;
+                document.getElementById('businessHoursOnly').checked = conditions.business_hours_only || false;
+                document.getElementById('businessDaysOnly').checked = conditions.business_days_only || false;
+                document.getElementById('conditionLogic').value = conditions.condition_logic || 'AND';
+                // CRITICAL FIX: Load apply_to_existing_emails
+                document.getElementById('applyToExisting').checked = rule.apply_to_existing_emails || false;
+            }
+            
+            // CRITICAL FIX: Load schedule fields
+            if (rule.schedule_start) {
+                const date = new Date(rule.schedule_start);
+                document.getElementById('scheduleStart').value = date.toISOString().slice(0, 16);
+            }
+            
+            if (rule.schedule_end) {
+                const date = new Date(rule.schedule_end);
+                document.getElementById('scheduleEnd').value = date.toISOString().slice(0, 16);
+            }
+            
+            if (rule.business_hours_start) {
+                document.getElementById('businessHoursStart').value = rule.business_hours_start;
+            }
+            
+            if (rule.business_hours_end) {
+                document.getElementById('businessHoursEnd').value = rule.business_hours_end;
+            }
+            
+            // Set template
+            if (rule.template_id) {
+                document.getElementById('templateSelect').value = rule.template_id;
+                handleTemplateSelectChange(); // Call this to hide template fields
+            } else if (rule.template_data) {
+                // Create a new option for the existing template
+                const newOption = document.createElement('option');
+                newOption.value = 'new';
+                newOption.textContent = 'Create New Template';
+                
+                // Add it to the select and select it
+                const templateSelect = document.getElementById('templateSelect');
+                templateSelect.appendChild(newOption);
+                templateSelect.value = 'new';
+                
+                // Show the template fields and populate them
+                handleTemplateSelectChange(); // Call this to show and make fields required
+                document.getElementById('templateName').value = rule.template_data.name;
+                document.getElementById('replySubject').value = rule.template_data.reply_subject || '';
+                document.getElementById('replyBody').value = rule.template_data.reply_body;
+            }
+        } else {
+            showToast('Failed to load rule data', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error loading rule', 'error');
+        console.error('Error:', error);
+    });
+}
+
+function closeRuleModal() {
+    const modal = document.getElementById('ruleModal');
+    modal.classList.add('hidden');
+    document.getElementById('ruleForm').reset();
+    document.getElementById('templateFields').classList.add('hidden');
+    // Reset required attributes on close
+    document.getElementById('templateName').removeAttribute('required');
+    document.getElementById('replyBody').removeAttribute('required');
+    isEditMode = false;
+    currentRuleId = null;
+}
+
+function editRule(ruleId) {
+    openRuleModal(ruleId);
+}
+
+function duplicateRule(ruleId) {
+    fetch(`/api/auto-reply/rules/duplicate/${ruleId}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Rule duplicated successfully', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('Failed to duplicate rule', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error duplicating rule', 'error');
+    });
+}
+
+function toggleRuleStatus(ruleId) {
+    fetch(`/api/auto-reply/rules/toggle/${ruleId}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`Rule ${data.is_active ? 'activated' : 'deactivated'}`, 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('Failed to toggle rule', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error toggling rule', 'error');
+    });
+}
+
+function testRule(ruleId) {
+    currentRuleId = ruleId;
+    document.getElementById('testRuleModal').classList.remove('hidden');
+    document.getElementById('testRuleModal').classList.add('fade-in');
+}
+
+function sendTestRule() {
+    const recipient = document.getElementById('testRecipient').value;
+    const subject = document.getElementById('testSubject').value;
+    const body = document.getElementById('testBody').value;
+    const messageId = document.getElementById('testMessageId').value;
+    // CRITICAL FIX: Added Gmail ID and Thread ID
+    const gmailId = document.getElementById('testGmailId').value;
+    const threadId = document.getElementById('testThreadId').value;
+    const sendActualEmail = document.getElementById('sendActualEmail').checked;
+    
+    if (!recipient) {
+        showToast('Please enter a test recipient email', 'error');
+        return;
+    }
+    
+    // CRITICAL FIX: Support multiple recipients
+    const recipients = recipient.split(',').map(r => r.trim()).filter(r => r);
+    
+    fetch(`/api/auto-reply/test/${currentRuleId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            recipient: recipients[0], // Use first recipient for compatibility
+            sender: 'test@example.com',
+            subject: subject,
+            body_text: body,
+            message_id: messageId || `test-message-${Date.now()}@example.com`,
+            gmail_id: gmailId || `test_gmail_id_${Date.now()}`,
+            thread_id: threadId || `test_thread_${Date.now()}`,
+            send_test: sendActualEmail
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const message = sendActualEmail 
+                ? `Test email sent successfully to ${recipients[0]}` 
+                : `Test email preview generated successfully`;
+            showToast(message, 'success');
+            closeTestRuleModal();
+        } else {
+            showToast(`Failed to ${sendActualEmail ? 'send' : 'generate'} test email: ${data.message || 'Unknown error'}`, 'error');
+        }
+    })
+    .catch(error => {
+        showToast(`Error ${sendActualEmail ? 'sending' : 'generating'} test email`, 'error');
+    });
+}
+
+function closeTestRuleModal() {
+    document.getElementById('testRuleModal').classList.add('hidden');
+    document.getElementById('testRuleForm').reset();
+}
+
+function viewTriggeredEmails(ruleId) {
+    currentRuleId = ruleId;
+    
+    fetch(`/api/auto-reply/rules/${ruleId}/triggered-emails`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayTriggeredEmails(data.emails);
+            document.getElementById('triggeredEmailsModal').classList.remove('hidden');
+            document.getElementById('triggeredEmailsModal').classList.add('fade-in');
+        } else {
+            showToast('Failed to load triggered emails', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error loading triggered emails', 'error');
+    });
+}
+
+function displayTriggeredEmails(emails) {
+    const container = document.getElementById('triggeredEmailsList');
+    
+    if (emails.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8">
+                <i class="fas fa-inbox text-4xl text-gray-400 dark:text-gray-600 mb-4"></i>
+                <p class="text-gray-500 dark:text-gray-400">No emails have triggered this rule yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = emails.map(email => `
+        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-white">${email.subject || 'No Subject'}</h4>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">From: ${email.sender}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Received: ${format_indian_time(email.received_at)}</p>
+                    <!-- CRITICAL FIX: Added Gmail ID display -->
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Gmail ID: <span class="gmail-id-display">${email.gmail_id || 'Unknown'}</span></p>
+                    <!-- CRITICAL FIX: Added Message-ID display -->
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Message-ID: <span class="message-id-display">${email.message_id || 'Unknown'}</span></p>
+                    <!-- FIX 2: No UI indicator for "Already processed email" -->
+                    ${email.processed_for_auto_reply ? `
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <span class="text-xs text-gray-500">Already processed</span>
+                    </p>
+                    ` : ''}
+                    <p class="mt-2 text-sm text-gray-600 dark:text-gray-300 line-clamp-2">${email.snippet || ''}</p>
+                </div>
+                <div class="ml-4">
+                    <!-- ✅ FIXED: Using JavaScript instead of Jinja in template literal -->
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        (email.status === 'Sent' || (email.status === 'Failed' && email.message_id)) 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : email.status === 'Scheduled' 
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                            : email.status === 'Skipped'
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            : email.status === 'Not_Matched'
+                            ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                            : email.status === 'Cancelled'
+                            ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                    }">
+                        ${
+                            (email.status === 'Sent' || (email.status === 'Failed' && email.message_id))
+                                ? '✅ Sent'
+                                : email.status === 'Scheduled'
+                                ? '🔵 Scheduled'
+                                : email.status === 'Skipped'
+                                ? '⚠️ Skipped'
+                                : email.status === 'Not_Matched'
+                                ? '⚪ Not Matched'
+                                : email.status === 'Cancelled'
+                                ? '🟠 Cancelled'
+                                : '❌ Failed'
+                        }
+                    </span>
+                </div>
+        </div>
+    `).join('');
+}
+
+function closeTriggeredEmailsModal() {
+    document.getElementById('triggeredEmailsModal').classList.add('hidden');
+}
+
+function deleteRule(ruleId) {
+    if (confirm('Are you sure you want to delete this rule? This action cannot be undone.')) {
+        fetch(`/api/auto-reply/rules/delete/${ruleId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Rule deleted successfully', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast('Failed to delete rule', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error deleting rule', 'error');
+        });
+    }
+}
+
+function viewReply(logId) {
+    fetch(`/api/auto-reply/logs/${logId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showReplyDetailsModal(data.log);
+        } else {
+            showToast('Failed to load reply details', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error loading reply details', 'error');
+    });
+}
+
+function showReplyDetailsModal(log) {
+    const modal = document.getElementById('replyDetailsModal');
+    const content = document.getElementById('replyDetailsContent');
+    const actions = document.getElementById('replyActions');
+    
+    // Format the sender email(s) with multiple email option
+    let senderHtml = '';
+    if (log.recipient_email) {
+        const emails = log.recipient_email.split(',').map(e => e.trim());
+        if (emails.length === 1) {
+            senderHtml = `<span class="email-display">${emails[0]}</span>`;
+        } else {
+            senderHtml = `
+                <div class="email-list">
+                    ${emails.map(email => `
+                        <span class="email-chip">
+                            <i class="fas fa-envelope"></i>
+                            ${email}
+                        </span>
+                    `).join('')}
+                </div>
+            `;
+        }
+    } else {
+        senderHtml = 'Unknown';
+    }
+    
+    // ✅ CRITICAL FIX: Accept full log object to properly access both status and message_id
+    const getStatusClass = (log) => {
+        const status = log.status;
+        if (status === 'Sent' || (status === 'Failed' && log.message_id)) {
+            return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+        } else if (status === 'Scheduled') {
+            return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+        } else if (status === 'Skipped') {
+            return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+        } else if (status === 'Not_Matched') {
+            return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+        } else if (status === 'Cancelled') {
+            return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+        } else {
+            return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+        }
+    };
+    
+    const getStatusText = (log) => {
+        const status = log.status;
+        if (status === 'Sent' || (status === 'Failed' && log.message_id)) {
+            return '✅ Sent';
+        } else if (status === 'Scheduled') {
+            return '🔵 Scheduled';
+        } else if (status === 'Skipped') {
+            return '⚠️ Skipped';
+        } else if (status === 'Not_Matched') {
+            return '⚪ Not Matched';
+        } else if (status === 'Cancelled') {
+            return '🟠 Cancelled';
+        } else {
+            return '❌ Failed';
+        }
+    };
+    
+    content.innerHTML = `
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Original Email</h4>
+            <p class="mt-1 text-sm text-gray-900 dark:text-white">${log.incoming_subject || 'No Subject'}</p>
+        </div>
+        
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Sender</h4>
+            <p class="mt-1 text-sm text-gray-900 dark:text-white">${senderHtml}</p>
+        </div>
+        
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Rule</h4>
+            <p class="mt-1 text-sm text-gray-900 dark:text-white">${log.rule_name || 'Unknown'}</p>
+        </div>
+        
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Template</h4>
+            <p class="mt-1 text-sm text-gray-900 dark:text-white">${log.template_name || 'Unknown'}</p>
+        </div>
+        
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Status</h4>
+            <!-- ✅ CRITICAL FIX: Using JavaScript instead of Jinja -->
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(log)}">
+                ${getStatusText(log)}
+            </span>
+        </div>
+        
+        ${log.skip_reason ? `
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Skip Reason</h4>
+            <p class="mt-1 text-sm text-gray-900 dark:text-white">${log.skip_reason}</p>
+        </div>
+        ` : ''}
+        
+        ${log.error_message ? `
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Error Message</h4>
+            <p class="mt-1 text-sm text-red-600 dark:text-red-400">${log.error_message}</p>
+        </div>
+        ` : ''}
+        
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Executed At</h4>
+            <p class="mt-1 text-sm text-gray-900 dark:text-white">
+                ${format_indian_time(log.created_at)}
+            </p>
+        </div>
+        
+        <!-- CRITICAL FIX: Added Gmail ID display -->
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Gmail ID</h4>
+            <p class="mt-1 text-sm text-gray-900 dark:text-white">
+                <span class="gmail-id-display">${log.gmail_id || 'Unknown'}</span>
+            </p>
+        </div>
+        
+        <!-- CRITICAL FIX: Added Message-ID display -->
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Message-ID</h4>
+            <p class="mt-1 text-sm text-gray-900 dark:text-white">
+                <span class="message-id-display">${log.message_id || 'Unknown'}</span>
+            </p>
+        </div>
+        
+        <!-- CRITICAL FIX: SHOW DELAY AND SCHEDULE INFO -->
+        ${log.delay_minutes && log.delay_minutes > 0 ? `
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Delay</h4>
+            <p class="mt-1 text-sm text-blue-600 dark:text-blue-400">
+                <i class="fas fa-clock mr-1"></i>
+                ${log.delay_minutes} minutes
+            </p>
+        </div>
+        ` : ''}
+        
+        ${log.schedule_start || log.schedule_end ? `
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Schedule</h4>
+            <p class="mt-1 text-sm text-indigo-600 dark:text-indigo-400">
+                <i class="fas fa-calendar-alt mr-1"></i>
+                ${log.schedule_start ? `From ${format_indian_time(log.schedule_start)}` : ''}
+                ${log.schedule_end ? ` until ${format_indian_time(log.schedule_end)}` : ''}
+            </p>
+        </div>
+        ` : ''}
+        
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Reply Content</h4>
+            <div class="mt-1 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <pre class="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">${log.reply_content || 'No content'}</pre>
+            </div>
+        </div>
+    `;
+    
+    // Add actions based on status
+    if (log.status === 'Failed') {
+        actions.innerHTML = `
+            <button onclick="retryReply(${log.id})" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors">
+                <i class="fas fa-redo mr-1"></i> Retry
+            </button>
+        `;
+    } else if (log.rule_id) {
+        actions.innerHTML = `
+            <button onclick="disableRuleFromLog(${log.rule_id})" class="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors">
+                <i class="fas fa-ban mr-1"></i> Disable Rule
+            </button>
+        `;
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('fade-in');
+}
+
+function closeReplyDetailsModal() {
+    document.getElementById('replyDetailsModal').classList.add('hidden');
+}
+
+function retryReply(logId) {
+    if (confirm('Are you sure you want to retry this auto-reply?')) {
+        fetch(`/api/auto-reply/logs/${logId}/retry`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Auto-reply retried successfully', 'success');
+                closeReplyDetailsModal();
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast('Failed to retry auto-reply', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error retrying auto-reply', 'error');
+        });
+    }
+}
+
+function disableRuleFromLog(ruleId) {
+    if (confirm('Are you sure you want to disable this rule?')) {
+        fetch(`/api/auto-reply/rules/toggle/${ruleId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ is_active: false })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Rule disabled successfully', 'success');
+                closeReplyDetailsModal();
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast('Failed to disable rule', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error disabling rule', 'error');
+        });
+    }
+}
+
+function deleteLog(logId) {
+    if (confirm('Are you sure you want to delete this log entry?')) {
+        fetch(`/api/auto-reply/logs/${logId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const logElement = document.querySelector(`[data-log-id="${logId}"]`);
+                if (logElement) {
+                    logElement.remove();
+                    showToast('Log deleted successfully', 'success');
+                    
+                    // Check if no logs left
+                    if (document.querySelectorAll('.log-item').length === 0) {
+                        setTimeout(() => window.location.reload(), 1000);
+                    }
+                }
+            } else {
+                showToast('Failed to delete log', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error deleting log', 'error');
+        });
+    }
+}
+
+function handleRefresh() {
+    // ✅ CRITICAL FIX: Ask for confirmation before processing
+    if (!confirm('This will check for new emails and process auto-replies. Continue?')) {
+        return;
+    }
+    
+    const btn = document.getElementById('refreshBtn');
+    const icon = btn.querySelector('i');
+    icon.classList.add('fa-spin');
+    
+    fetch('/api/auto-reply/refresh', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Data refreshed successfully', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('Failed to refresh data', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error refreshing data', 'error');
+    })
+    .finally(() => {
+        icon.classList.remove('fa-spin');
+    });
+}
+
+function handleExportRules() {
+    fetch('/api/auto-reply/export-rules')
+    .then(response => response.blob())
+    .then(blob => {
+        downloadFile(blob, 'auto-reply-rules.csv');
+        showToast('Rules exported successfully', 'success');
+    })
+    .catch(error => {
+        showToast('Error exporting rules', 'error');
+    });
+}
+
+function handleExportLogs() {
+    fetch('/api/auto-reply/export-logs')
+    .then(response => response.blob())
+    .then(blob => {
+        downloadFile(blob, 'auto-reply-logs.csv');
+        showToast('Logs exported successfully', 'success');
+    })
+    .catch(error => {
+        showToast('Error exporting logs', 'error');
+    });
+}
+
+function handleGlobalToggle() {
+    const isCurrentlyEnabled = {{ 'true' if global_enabled else 'false' }};
+    const newState = !isCurrentlyEnabled;
+    
+    if (confirm(`Are you sure you want to ${newState ? 'enable' : 'disable'} all auto-reply rules?`)) {
+        fetch('/api/auto-reply/global-toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ enabled: newState })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`All auto-reply rules ${newState ? 'enabled' : 'disabled'}`, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast(`Failed to ${newState ? 'enable' : 'disable'} rules`, 'error');
+            }
+        })
+        .catch(error => {
+            showToast(`Error ${newState ? 'enabling' : 'disabling'} rules`, 'error');
+        });
+    }
+}
+
+function handleLogFilter(e) {
+    const filter = e.target.value;
+    document.querySelectorAll('.log-item').forEach(item => {
+        if (filter === 'all') {
+            item.style.display = 'block';
+        } else {
+            const statusElement = item.querySelector('.inline-flex.items-center');
+            const status = statusElement.textContent.trim();
+            item.style.display = status.includes(filter) ? 'block' : 'none';
+        }
+    });
+}
+
+function handleRetryFailed() {
+    if (confirm('Are you sure you want to retry all failed auto-replies?')) {
+        fetch('/api/auto-reply/retry-failed', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`Retrying ${data.count} failed auto-replies`, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast('Failed to retry auto-replies', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error retrying auto-replies', 'error');
+        });
+    }
+}
+
+function downloadFile(blob, filename) {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+}
+
+// CRITICAL FIX: Enhanced time display functions
+function updateLogTimes() {
+    document.querySelectorAll('.log-time').forEach(element => {
+        const timestamp = element.getAttribute('data-timestamp');
+        if (timestamp) {
+            const date = new Date(timestamp);
+            const indianTime = convertToIndianTime(date);
+            const now = new Date();
+            const indianNow = convertToIndianTime(now);
+            const diffMs = indianNow - indianTime;
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            let displayTime;
+            if (diffMins < 1) {
+                displayTime = 'Just now';
+            } else if (diffMins < 60) {
+                displayTime = `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+            } else if (diffMins < 1440) {
+                const diffHours = Math.floor(diffMins / 60);
+                displayTime = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            } else if (diffMins < 10080) { // Less than 7 days
+                displayTime = indianTime.toLocaleDateString('en-IN', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } else {
+                displayTime = indianTime.toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            }
+            
+            // CRITICAL FIX: Added tooltip with full date and time
+            const fullDateTime = indianTime.toLocaleString('en-IN', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZoneName: 'short'
+            });
+            
+            element.innerHTML = `
+                <span class="tooltip">
+                    ${displayTime} <span class="timezone-indicator">IST</span>
+                    <span class="tooltiptext">${fullDateTime}</span>
+                </span>
+            `;
+        }
+    });
+}
+
+function convertToIndianTime(date) {
+    // Convert UTC date to Indian time
+    return new Date(date.toLocaleString("en-US", {timeZone: INDIAN_TIMEZONE}));
+}
+
+// CRITICAL FIX: Changed function name to match backend
+function format_indian_time(dateString) {
+    if (!dateString) return 'Unknown';
+    
+    const date = new Date(dateString);
+    const indianTime = convertToIndianTime(date);
+    
+    return indianTime.toLocaleString('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone: INDIAN_TIMEZONE
+    });
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    const bgColor = type === 'success' ? 'bg-green-500' : 
+                    type === 'error' ? 'bg-red-500' : 
+                    'bg-blue-500';
+    
+    toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white ${bgColor} z-50 fade-in`;
+    toast.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : 
+                            type === 'error' ? 'fa-exclamation-circle' : 
+                            'fa-info-circle'} mr-3"></i>
+            <span>${message}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 hover:opacity-75">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

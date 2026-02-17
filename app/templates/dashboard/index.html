@@ -1,0 +1,725 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - AI Email Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Welcome back, {{ current_user.username }}! Here's what's happening with your emails today.
+        </p>
+    </div>
+    
+    <!-- Search Bar -->
+    <div class="mb-6">
+        <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fas fa-search text-gray-400"></i>
+            </div>
+            <input type="text" 
+                   class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
+                   placeholder="Search emails...">
+        </div>
+    </div>
+    
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="glass rounded-xl p-6 neumorphic hover-lift">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-indigo-100 dark:bg-indigo-900 rounded-lg p-3">
+                    <i class="fas fa-inbox text-indigo-600 dark:text-indigo-400 text-xl"></i>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Inbox</dt>
+                        <dd class="text-lg font-medium text-gray-900 dark:text-white">
+                            {% if emails %}
+                                {{ emails|length }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        
+        <div class="glass rounded-xl p-6 neumorphic hover-lift">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-green-100 dark:bg-green-900 rounded-lg p-3">
+                    <i class="fas fa-paper-plane text-green-600 dark:text-green-400 text-xl"></i>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Sent</dt>
+                        <dd class="text-lg font-medium text-gray-900 dark:text-white">12</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        
+        <div class="glass rounded-xl p-6 neumorphic hover-lift">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-yellow-100 dark:bg-yellow-900 rounded-lg p-3">
+                    <i class="fas fa-clock text-yellow-600 dark:text-yellow-400 text-xl"></i>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Pending</dt>
+                        <dd class="text-lg font-medium text-gray-900 dark:text-white">3</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        
+        <div class="glass rounded-xl p-6 neumorphic hover-lift">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-purple-100 dark:bg-purple-900 rounded-lg p-3">
+                    <i class="fas fa-robot text-purple-600 dark:text-purple-400 text-xl"></i>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Active Rules</dt>
+                        <dd class="text-lg font-medium text-gray-900 dark:text-white">
+                            {{ rules_count if rules_count is defined else 0 }}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Emails and AI Assistant -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Recent Emails -->
+        <div class="lg:col-span-2 glass rounded-xl p-6 neumorphic">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                    Recent Emails
+                    {% if emails %}
+                        <a href="{{ url_for('main.inbox') }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 ml-2">
+                            View all ({{ emails|length }})
+                        </a>
+                    {% endif %}
+                </h2>
+            </div>
+            
+            <div class="space-y-4">
+                {% if emails and emails|length > 0 %}
+                    {% for email in emails %}
+                    <div class="border-b border-gray-200 dark:border-gray-700 pb-4 {% if not loop.last %}border-b{% else %}border-0{% endif %}">
+                        <div class="flex items-start space-x-3">
+                            <!-- Sender Avatar -->
+                            <div class="flex-shrink-0">
+                                {% if email.get('sender') %}
+                                    <img class="h-10 w-10 rounded-full" 
+                                         src="https://picsum.photos/seed/{{ email.get('sender', '') }}/200/200.jpg" 
+                                         alt="{{ email.get('sender', '') }}"
+                                         loading="lazy">
+                                {% else %}
+                                    <div class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                                        <i class="fas fa-user text-gray-500 dark:text-gray-400"></i>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Email Content -->
+                            <div class="flex-1 min-w-0">
+                                <!-- Email Header -->
+                                <div class="flex items-center justify-between mb-1">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white {% if not email.get('is_read', True) %}font-semibold{% endif %}">
+                                            {% if email.get('sender') %}
+                                                {{ email.get('sender', '').split('@')[0] }}
+                                            {% else %}
+                                                Unknown Sender
+                                            {% endif %}
+                                        </p>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                                            {% if email.get('sender') %}
+                                                {{ email.get('sender', '') }}
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <!-- Date -->
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                                            {{ email.get('formatted_date', '') }}
+                                        </span>
+                                        
+                                        <!-- Urgent Badge -->
+                                        {% if email.get('is_urgent', False) %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                            Urgent
+                                        </span>
+                                        {% endif %}
+                                        
+                                        <!-- Star Button -->
+                                        <button class="star-btn p-1 text-gray-400 hover:text-yellow-500" 
+                                                data-message-id="{{ email.get('id', '') }}"
+                                                data-starred="{{ email.get('is_starred', False) }}">
+                                            <i class="fas fa-star {% if email.get('is_starred', False) %}text-yellow-500{% endif %}"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Subject -->
+                                <p class="text-sm font-medium text-gray-900 dark:text-white {% if not email.get('is_read', True) %}font-semibold{% endif %}">
+                                    {{ email.get('subject', '(No Subject)') }}
+                                </p>
+                                
+                                <!-- Body Preview -->
+                                <div class="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                                    {% if email.get('snippet', '') %}
+                                        <div class="line-clamp-2">
+                                            {{ email.get('snippet', '')[:80] }}{% if email.get('snippet', '')|length > 80 %}...{% endif %}
+                                        </div>
+                                    {% elif email.get('body', {}).get('text', '') %}
+                                        <div class="line-clamp-2">
+                                            {{ email.get('body', {}).get('text', '')[:80] }}{% if email.get('body', {}).get('text', '')|length > 80 %}...{% endif %}
+                                        </div>
+                                    {% else %}
+                                        <div class="line-clamp-2">
+                                            <em class="text-gray-400">No content available</em>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Action Buttons -->
+                                <div class="flex items-center mt-2 space-x-4">
+                                    <a href="{{ url_for('main.view_email', message_id=email.get('id', '')) }}" 
+                                       class="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+                                        <i class="fas fa-external-link-alt mr-1"></i>
+                                        View
+                                    </a>
+                                    
+                                    <button class="inline-flex items-center px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                        <i class="fas fa-reply mr-1"></i>
+                                        Reply
+                                    </button>
+                                    
+                                    <button class="inline-flex items-center px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                        <i class="fas fa-share mr-1"></i>
+                                        Forward
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <!-- Empty State -->
+                    <div class="text-center py-8">
+                        <i class="fas fa-inbox text-5xl text-gray-400 dark:text-gray-600 mb-4"></i>
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No recent emails</h3>
+                        <p class="text-gray-500 dark:text-gray-400 mb-4">
+                            {% if gmail_connected is defined and gmail_connected %}
+                                Your inbox is empty. Check back later for new messages.
+                            {% else %}
+                                Connect your Gmail account to see your emails.
+                            {% endif %}
+                        </p>
+                        {% if gmail_connected is defined and not gmail_connected %}
+                        <a href="{{ url_for('auth.gmail_authorize') }}" 
+                           class="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            <i class="fab fa-google mr-2"></i>
+                            Connect Gmail
+                        </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- AI Assistant -->
+        <div class="glass rounded-xl p-6 neumorphic">
+            <div class="flex items-center mb-4">
+                <div class="flex-shrink-0 bg-indigo-100 dark:bg-indigo-900 rounded-lg p-2">
+                    <i class="fas fa-robot text-indigo-600 dark:text-indigo-400"></i>
+                </div>
+                <h2 class="ml-3 text-xl font-semibold text-gray-900 dark:text-white">AI Email Assistant</h2>
+            </div>
+            
+            <!-- AI Assistant Options -->
+            <div class="space-y-3 mb-6">
+                <button id="generateEmailBtn" 
+                        class="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-pen mr-2"></i>
+                    Generate Email
+                </button>
+                
+                <button id="classifyEmailsBtn" 
+                        class="w-full flex items-center justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-tags mr-2"></i>
+                    Classify Emails
+                </button>
+                
+                <button id="scheduleFollowUpBtn" 
+                        class="w-full flex items-center justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-calendar-alt mr-2"></i>
+                    Schedule Follow-up
+                </button>
+            </div>
+            
+            <!-- Email Generation Form (Hidden by default) -->
+            <div id="emailGenerationForm" class="hidden space-y-4 mb-6">
+                <div>
+                    <label for="purpose" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email Purpose</label>
+                    <input type="text" 
+                           id="purpose" 
+                           name="purpose" 
+                           class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" 
+                           placeholder="e.g., Follow up on meeting">
+                </div>
+                
+                <div>
+                    <label for="tone" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tone</label>
+                    <select id="tone" 
+                            name="tone" 
+                            class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="professional">Professional</option>
+                        <option value="friendly">Friendly</option>
+                        <option value="formal">Formal</option>
+                        <option value="casual">Casual</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="notes" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Key Points</label>
+                    <textarea id="notes" 
+                              name="notes" 
+                              rows="3" 
+                              class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" 
+                              placeholder="Include important details..."></textarea>
+                </div>
+                
+                <button id="generateBtn" 
+                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-magic mr-2"></i>
+                    Generate Email
+                </button>
+                
+                <!-- Generated Email Display -->
+                <div id="generatedEmail" class="hidden">
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Generated Email</h3>
+                        <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                            <p id="generatedSubject" class="text-sm font-medium text-gray-900 dark:text-white mb-2"></p>
+                            <div id="generatedBody" class="text-sm text-gray-600 dark:text-gray-300 max-h-32 overflow-y-auto">
+                                <!-- Generated content will appear here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="mt-3 grid grid-cols-3 gap-2">
+                            <button id="regenerateBtn" 
+                                    class="py-2 px-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <i class="fas fa-redo mr-1"></i>
+                                Regenerate
+                            </button>
+                            <button id="copyBtn" 
+                                    class="py-2 px-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <i class="fas fa-copy mr-1"></i>
+                                Copy
+                            </button>
+                            <button id="useBtn" 
+                                    class="py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <i class="fas fa-edit mr-1"></i>
+                                Use in Compose
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Recent Activity</h3>
+                <div class="space-y-2">
+                    <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                        <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                        <span>3 emails classified</span>
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                        <i class="fas fa-clock text-blue-500 mr-2"></i>
+                        <span>2 follow-ups scheduled</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // GSAP animations for dashboard elements
+    if (typeof gsap !== 'undefined') {
+        gsap.from(".glass", {
+            duration: 0.8,
+            y: 30,
+            opacity: 0,
+            stagger: 0.1,
+            ease: "power3.out"
+        });
+    }
+    
+    // AI Assistant toggle functionality
+    const generateEmailBtn = document.getElementById('generateEmailBtn');
+    const classifyEmailsBtn = document.getElementById('classifyEmailsBtn');
+    const scheduleFollowUpBtn = document.getElementById('scheduleFollowUpBtn');
+    const emailGenerationForm = document.getElementById('emailGenerationForm');
+    
+    generateEmailBtn.addEventListener('click', function() {
+        emailGenerationForm.classList.toggle('hidden');
+    });
+    
+    classifyEmailsBtn.addEventListener('click', function() {
+        // Show loading state
+        classifyEmailsBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Classifying...';
+        classifyEmailsBtn.disabled = true;
+        
+        // Make API call to classify emails
+        fetch('/api/emails/classify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showToast(data.error, 'error');
+            } else {
+                showToast(`${data.count} emails classified successfully!`, 'success');
+                // Update the recent activity
+                updateRecentActivity('classify', data.count);
+            }
+        })
+        .catch(error => {
+            showToast('Error classifying emails', 'error');
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            classifyEmailsBtn.innerHTML = '<i class="fas fa-tags mr-2"></i>Classify Emails';
+            classifyEmailsBtn.disabled = false;
+        });
+    });
+    
+    scheduleFollowUpBtn.addEventListener('click', function() {
+        // Show a simple modal for scheduling follow-up
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
+        modal.innerHTML = `
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Schedule Follow-up</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            Select an email and schedule a follow-up reminder.
+                        </p>
+                        <div class="mt-4">
+                            <label for="followupEmail" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+                            <select id="followupEmail" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                <option value="">Select an email...</option>
+                                {% if emails %}
+                                    {% for email in emails %}
+                                        <option value="{{ email.get('id', '') }}">
+                                            {% if email.get('subject') %}
+                                                {{ email.get('subject', '')[:30] }}{% if email.get('subject', '')|length > 30 %}...{% endif %}
+                                            {% else %}
+                                                No Subject
+                                            {% endif %}
+                                        </option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div class="mt-4">
+                            <label for="followupDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Date</label>
+                            <input type="date" id="followupDate" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div class="mt-4">
+                            <label for="followupNotes" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Notes</label>
+                            <textarea id="followupNotes" rows="2" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Follow-up details..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="cancelFollowup" class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-white rounded-md mr-2">Cancel</button>
+                    <button id="confirmFollowup" class="px-4 py-2 bg-indigo-600 text-white rounded-md">Schedule</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Set minimum date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('followupDate').setAttribute('min', today);
+        
+        // Handle modal actions
+        document.getElementById('cancelFollowup').addEventListener('click', function() {
+            document.body.removeChild(modal);
+        });
+        
+        document.getElementById('confirmFollowup').addEventListener('click', function() {
+            const emailId = document.getElementById('followupEmail').value;
+            const date = document.getElementById('followupDate').value;
+            const notes = document.getElementById('followupNotes').value;
+            
+            if (!emailId || !date) {
+                showToast('Please select an email and date', 'warning');
+                return;
+            }
+            
+            // Show loading state
+            document.getElementById('confirmFollowup').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Scheduling...';
+            document.getElementById('confirmFollowup').disabled = true;
+            
+            // Make API call to schedule follow-up
+            fetch('/api/followups', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email_id: emailId,
+                    scheduled_date: date,
+                    notes: notes
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                } else {
+                    showToast('Follow-up scheduled successfully!', 'success');
+                    // Update the recent activity
+                    updateRecentActivity('followup', 1);
+                    document.body.removeChild(modal);
+                }
+            })
+            .catch(error => {
+                showToast('Error scheduling follow-up', 'error');
+                console.error('Error:', error);
+            })
+            .finally(() => {
+                document.getElementById('confirmFollowup').innerHTML = 'Schedule';
+                document.getElementById('confirmFollowup').disabled = false;
+            });
+        });
+    });
+    
+    // Email generation functionality
+    const generateBtn = document.getElementById('generateBtn');
+    const regenerateBtn = document.getElementById('regenerateBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const useBtn = document.getElementById('useBtn');
+    const generatedEmail = document.getElementById('generatedEmail');
+    const generatedSubject = document.getElementById('generatedSubject');
+    const generatedBody = document.getElementById('generatedBody');
+    
+    // Toast notification function
+    function showToast(message, type = 'info') {
+        // Create toast element if it doesn't exist
+        let toast = document.getElementById('toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'toast';
+            toast.className = 'fixed bottom-4 right-4 px-4 py-3 rounded-md shadow-lg transform transition-all duration-300 translate-y-full opacity-0 z-50';
+            document.body.appendChild(toast);
+        }
+        
+        // Set toast content and styling based on type
+        toast.textContent = message;
+        toast.className = 'fixed bottom-4 right-4 px-4 py-3 rounded-md shadow-lg transform transition-all duration-300 z-50';
+        
+        switch(type) {
+            case 'success':
+                toast.classList.add('bg-green-500', 'text-white');
+                break;
+            case 'error':
+                toast.classList.add('bg-red-500', 'text-white');
+                break;
+            case 'warning':
+                toast.classList.add('bg-yellow-500', 'text-white');
+                break;
+            default:
+                toast.classList.add('bg-blue-500', 'text-white');
+        }
+        
+        // Show toast
+        setTimeout(() => {
+            toast.classList.remove('translate-y-full', 'opacity-0');
+        }, 100);
+        
+        // Hide toast after 3 seconds
+        setTimeout(() => {
+            toast.classList.add('translate-y-full', 'opacity-0');
+        }, 3000);
+    }
+    
+    // Update recent activity
+    function updateRecentActivity(type, count) {
+        const recentActivity = document.querySelector('.border-t.border-gray-200 .space-y-2');
+        if (type === 'classify') {
+            const classifyActivity = recentActivity.querySelector('.fa-check-circle').parentElement;
+            const currentCount = parseInt(classifyActivity.textContent.match(/\d+/)[0]);
+            classifyActivity.innerHTML = `<i class="fas fa-check-circle text-green-500 mr-2"></i><span>${currentCount + count} emails classified</span>`;
+        } else if (type === 'followup') {
+            const followupActivity = recentActivity.querySelector('.fa-clock').parentElement;
+            const currentCount = parseInt(followupActivity.textContent.match(/\d+/)[0]);
+            followupActivity.innerHTML = `<i class="fas fa-clock text-blue-500 mr-2"></i><span>${currentCount + count} follow-ups scheduled</span>`;
+        }
+    }
+    
+    function generateEmail() {
+        const purpose = document.getElementById('purpose').value;
+        const tone = document.getElementById('tone').value;
+        const notes = document.getElementById('notes').value;
+        
+        if (!purpose || !tone) {
+            showToast('Please fill in the purpose and tone fields', 'warning');
+            return;
+        }
+        
+        // Show loading state
+        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
+        generateBtn.disabled = true;
+        
+        // Make API call to generate email
+        fetch('/api/emails/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                purpose: purpose,
+                tone: tone,
+                notes: notes
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showToast(data.error, 'error');
+            } else {
+                // Display generated email
+                generatedSubject.textContent = data.subject || 'No Subject';
+                
+                // Handle body content
+                if (data.body_html) {
+                    generatedBody.innerHTML = data.body_html;
+                } else if (data.body) {
+                    // Clear the body first
+                    generatedBody.textContent = '';
+                    
+                    // Typewriter effect for the body
+                    const bodyText = data.body;
+                    let i = 0;
+                    
+                    function typeWriter() {
+                        if (i < bodyText.length) {
+                            generatedBody.textContent += bodyText.charAt(i);
+                            i++;
+                            setTimeout(typeWriter, 10);
+                        }
+                    }
+                    
+                    typeWriter();
+                } else {
+                    generatedBody.innerHTML = '<em class="text-gray-400">No content generated</em>';
+                }
+                
+                generatedEmail.classList.remove('hidden');
+                showToast('Email generated successfully!', 'success');
+            }
+        })
+        .catch(error => {
+            showToast('Error generating email', 'error');
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            generateBtn.innerHTML = '<i class="fas fa-magic mr-2"></i>Generate Email';
+            generateBtn.disabled = false;
+        });
+    }
+    
+    generateBtn.addEventListener('click', generateEmail);
+    regenerateBtn.addEventListener('click', generateEmail);
+    
+    copyBtn.addEventListener('click', function() {
+        const subject = generatedSubject.textContent;
+        let body = '';
+        
+        // Extract text from generated content
+        if (generatedBody.textContent) {
+            body = generatedBody.textContent;
+        } else if (generatedBody.innerHTML) {
+            // Create temporary element to extract text from HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = generatedBody.innerHTML;
+            body = tempDiv.textContent || tempDiv.innerText || '';
+        }
+        
+        const textToCopy = `Subject: ${subject}\n\n${body}`;
+        
+        navigator.clipboard.writeText(textToCopy).then(function() {
+            showToast('Email copied to clipboard!', 'success');
+        }, function(err) {
+            showToast('Failed to copy email', 'error');
+        });
+    });
+    
+    useBtn.addEventListener('click', function() {
+        const subject = generatedSubject.textContent;
+        let body = '';
+        
+        // Extract content for form submission
+        if (generatedBody.textContent) {
+            body = generatedBody.textContent;
+        } else if (generatedBody.innerHTML) {
+            body = generatedBody.innerHTML;
+        }
+        
+        // Create and submit form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("main.compose") }}';
+        
+        const subjectInput = document.createElement('input');
+        subjectInput.type = 'hidden';
+        subjectInput.name = 'subject';
+        subjectInput.value = subject;
+        
+        const bodyInput = document.createElement('input');
+        bodyInput.type = 'hidden';
+        bodyInput.name = 'body';
+        bodyInput.value = body;
+        
+        form.appendChild(subjectInput);
+        form.appendChild(bodyInput);
+        document.body.appendChild(form);
+        form.submit();
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + G to generate
+        if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+            e.preventDefault();
+            if (emailGenerationForm.classList.contains('hidden')) {
+                emailGenerationForm.classList.remove('hidden');
+            } else {
+                generateBtn.click();
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

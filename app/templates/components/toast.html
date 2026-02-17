@@ -1,0 +1,19 @@
+<!-- Toast Notifications Container -->
+<div id="toastContainer" class="fixed bottom-0 right-0 p-4 z-50 space-y-2"></div>
+
+<!-- Toast Template (hidden) -->
+<template id="toastTemplate">
+    <div class="toast flex items-center p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full">
+        <div class="flex-shrink-0">
+            <i class="fas toast-icon text-xl"></i>
+        </div>
+        <div class="ml-3">
+            <p class="text-sm font-medium toast-message"></p>
+        </div>
+        <div class="ml-auto pl-3">
+            <button class="toast-close inline-flex text-gray-400 hover:text-gray-500 focus:outline-none">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+</template>

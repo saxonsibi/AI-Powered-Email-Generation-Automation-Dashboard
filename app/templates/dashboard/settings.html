@@ -1,0 +1,546 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - AI Email Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Settings</h1>
+    
+    <!-- Gmail Integration -->
+    <div class="glass rounded-xl p-6 mb-6 neumorphic">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Gmail Integration</h2>
+            <div class="flex items-center">
+                {% if gmail_connected %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    Connected
+                </span>
+                {% else %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                    <i class="fas fa-times-circle mr-1"></i>
+                    Not Connected
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="space-y-4">
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                Connect your Gmail account to enable email fetching, sending, and automation features.
+            </p>
+            
+            <div class="flex space-x-3">
+                {% if gmail_connected %}
+                <a href="{{ url_for('auth.gmail_disconnect') }}" class="px-4 py-2 border border-red-300 dark:border-red-600 rounded-md shadow-sm text-sm font-medium text-red-700 dark:text-red-200 bg-white dark:bg-red-900 hover:bg-red-50 dark:hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                    <i class="fas fa-unlink mr-2"></i>
+                    Disconnect
+                </a>
+                {% else %}
+                <a href="{{ url_for('auth.gmail_authorize') }}" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fab fa-google mr-2"></i>
+                    Connect Gmail
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Email Notifications -->
+    <div class="glass rounded-xl p-6 mb-6 neumorphic">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Email Notifications</h2>
+            <div class="flex items-center">
+                <span id="notificationStatus" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    <i class="fas fa-bell mr-1"></i>
+                    Active
+                </span>
+            </div>
+        </div>
+        
+        <div class="space-y-4">
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                Configure how you receive notifications for new emails. The system tracks when emails were last checked to avoid duplicate notifications.
+            </p>
+            
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-medium text-gray-900 dark:text-white">Last Email Check</h3>
+                    <span id="lastSyncTime" class="text-sm text-gray-500 dark:text-gray-400">
+                        {% if last_email_sync_time %}
+                            {{ last_email_sync_time.strftime('%b %d, %Y at %I:%M %p') }}
+                        {% else %}
+                            Never
+                        {% endif %}
+                    </span>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    New emails received after this time will trigger notifications.
+                </p>
+            </div>
+            
+            <div class="flex space-x-3">
+                <button id="checkNowBtn" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    Check Now
+                </button>
+                <button id="resetSyncBtn" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-redo mr-2"></i>
+                    Reset Sync Time
+                </button>
+            </div>
+            
+            <div id="notificationResult" class="hidden mt-3 p-3 rounded-lg"></div>
+        </div>
+    </div>
+    
+    <!-- Automation Rules -->
+    <div class="glass rounded-xl p-6 mb-6 neumorphic">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Automation Rules</h2>
+            <button id="addRuleBtn" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fas fa-plus mr-2"></i>
+                Add Rule
+            </button>
+        </div>
+        
+        <div class="space-y-3">
+            {% if rules %}
+                {% for rule in rules %}
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-900 dark:text-white">{{ rule.name }}</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Created on {{ rule.created_at.strftime('%b %d, %Y') }}
+                            </p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <form action="{{ url_for('email.toggle_automation_rule', rule_id=rule.id) }}" method="POST" class="inline">
+                                <button type="submit" class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 {% if rule.is_active %}bg-indigo-600{% else %}bg-gray-200 dark:bg-gray-700{% endif %}">
+                                    <span class="translate-x-0 inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 {% if rule.is_active %}translate-x-5{% else %}translate-x-0{% endif %}"></span>
+                                </button>
+                            </form>
+                            <form action="{{ url_for('email.delete_automation_rule', rule_id=rule.id) }}" method="POST" class="inline">
+                                <button type="submit" class="text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="text-center py-6">
+                <i class="fas fa-robot text-4xl text-gray-400 dark:text-gray-600 mb-3"></i>
+                <p class="text-sm text-gray-500 dark:text-gray-400">No automation rules configured</p>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Create rules to automatically process your emails</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Add Rule Modal (Hidden by default) -->
+    <div id="ruleModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            
+            <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form id="ruleForm" action="{{ url_for('email.create_automation_rule') }}" method="POST">
+                    <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="mb-4">
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Create Automation Rule</h3>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label for="ruleName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rule Name</label>
+                                <input type="text" id="ruleName" name="name" required class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            </div>
+                            
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Trigger Conditions</h4>
+                                <div class="space-y-2">
+                                    <div>
+                                        <label for="sender" class="block text-xs text-gray-600 dark:text-gray-400">Sender contains</label>
+                                        <input type="text" id="sender" name="sender" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    </div>
+                                    <div>
+                                        <label for="subjectContains" class="block text-xs text-gray-600 dark:text-gray-400">Subject contains</label>
+                                        <input type="text" id="subjectContains" name="subject_contains" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    </div>
+                                    <div>
+                                        <label for="bodyContains" class="block text-xs text-gray-600 dark:text-gray-400">Body contains</label>
+                                        <input type="text" id="bodyContains" name="body_contains" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="isUrgent" name="is_urgent" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                        <label for="isUrgent" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                                            Mark as urgent
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Actions</h4>
+                                <div class="space-y-2">
+                                    <div>
+                                        <label for="autoReply" class="block text-xs text-gray-600 dark:text-gray-400">Auto-reply message</label>
+                                        <textarea id="autoReply" name="auto_reply_message" rows="2" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                                    </div>
+                                    <div>
+                                        <label for="addLabel" class="block text-xs text-gray-600 dark:text-gray-400">Add label</label>
+                                        <input type="text" id="addLabel" name="add_label" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="scheduleFollowUp" name="schedule_follow_up" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                        <label for="scheduleFollowUp" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                                            Schedule follow-up
+                                        </label>
+                                        <input type="number" id="followUpDelay" name="follow_up_delay" value="3" min="1" max="30" class="ml-2 w-16 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                        <span class="ml-1 text-sm text-gray-500 dark:text-gray-400">days</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            Create Rule
+                        </button>
+                        <button type="button" id="cancelRuleBtn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- User Preferences -->
+    <div class="glass rounded-xl p-6 neumorphic">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">User Preferences</h2>
+        
+        <div class="space-y-4">
+            <div>
+                <label for="theme" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Theme</label>
+                <select id="theme" name="theme" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                    <option value="system">System</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="language" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Language</label>
+                <select id="language" name="language" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="timezone" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Timezone</label>
+                <select id="timezone" name="timezone" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="UTC">UTC</option>
+                    <option value="Asia/Kolkata">India (IST)</option>
+                    <option value="America/New_York">Eastern Time</option>
+                    <option value="America/Chicago">Central Time</option>
+                    <option value="America/Denver">Mountain Time</option>
+                    <option value="America/Los_Angeles">Pacific Time</option>
+                </select>
+            </div>
+            
+            <div class="pt-4">
+                <button id="savePreferencesBtn" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Save Preferences
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // GSAP animations
+    gsap.from(".glass", {
+        duration: 0.8,
+        y: 30,
+        opacity: 0,
+        stagger: 0.1,
+        ease: "power3.out"
+    });
+    
+    // Rule modal functionality
+    const addRuleBtn = document.getElementById('addRuleBtn');
+    const ruleModal = document.getElementById('ruleModal');
+    const cancelRuleBtn = document.getElementById('cancelRuleBtn');
+    
+    addRuleBtn.addEventListener('click', function() {
+        ruleModal.classList.remove('hidden');
+        gsap.from(ruleModal.querySelector('.bg-white'), {
+            duration: 0.3,
+            scale: 0.9,
+            opacity: 0,
+            ease: "power2.out"
+        });
+    });
+    
+    cancelRuleBtn.addEventListener('click', function() {
+        gsap.to(ruleModal.querySelector('.bg-white'), {
+            duration: 0.3,
+            scale: 0.9,
+            opacity: 0,
+            ease: "power2.in",
+            onComplete: function() {
+                ruleModal.classList.add('hidden');
+            }
+        });
+    });
+    
+    // Close modal when clicking outside
+    ruleModal.addEventListener('click', function(e) {
+        if (e.target === ruleModal) {
+            gsap.to(ruleModal.querySelector('.bg-white'), {
+                duration: 0.3,
+                scale: 0.9,
+                opacity: 0,
+                ease: "power2.in",
+                onComplete: function() {
+                    ruleModal.classList.add('hidden');
+                }
+            });
+        }
+    });
+    
+    // Email notification functionality
+    const checkNowBtn = document.getElementById('checkNowBtn');
+    const resetSyncBtn = document.getElementById('resetSyncBtn');
+    const notificationResult = document.getElementById('notificationResult');
+    const lastSyncTime = document.getElementById('lastSyncTime');
+    
+    // Check for new emails now
+    checkNowBtn.addEventListener('click', function() {
+        const icon = this.querySelector('i');
+        icon.classList.add('fa-spin');
+        
+        fetch('/api/refresh-inbox', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                notificationResult.className = 'mt-3 p-3 rounded-lg bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
+                notificationResult.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        <span>Checked successfully. Found ${data.new_email_count} new email(s).</span>
+                    </div>
+                `;
+                
+                // Update last sync time
+                const now = new Date();
+                lastSyncTime.textContent = now.toLocaleString();
+                
+                // Show notification if new emails found
+                if (data.new_email_count > 0) {
+                    showNotification(data.new_email_count);
+                }
+            } else {
+                notificationResult.className = 'mt-3 p-3 rounded-lg bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
+                notificationResult.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        <span>Error: ${data.error}</span>
+                    </div>
+                `;
+            }
+            
+            notificationResult.classList.remove('hidden');
+            
+            // Hide result after 5 seconds
+            setTimeout(() => {
+                notificationResult.classList.add('hidden');
+            }, 5000);
+        })
+        .catch(error => {
+            console.error('Error checking emails:', error);
+            notificationResult.className = 'mt-3 p-3 rounded-lg bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
+            notificationResult.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span>Error checking emails. Please try again.</span>
+                </div>
+            `;
+            notificationResult.classList.remove('hidden');
+        })
+        .finally(() => {
+            icon.classList.remove('fa-spin');
+        });
+    });
+    
+    // Reset sync time
+    resetSyncBtn.addEventListener('click', function() {
+        if (confirm('Are you sure you want to reset the email sync time? This may cause notifications for existing emails to appear again.')) {
+            fetch('/api/reset-email-sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    notificationResult.className = 'mt-3 p-3 rounded-lg bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
+                    notificationResult.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            <span>Sync time reset successfully.</span>
+                        </div>
+                    `;
+                    
+                    // Update last sync time
+                    lastSyncTime.textContent = 'Never';
+                } else {
+                    notificationResult.className = 'mt-3 p-3 rounded-lg bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
+                    notificationResult.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-circle mr-2"></i>
+                            <span>Error: ${data.error}</span>
+                        </div>
+                    `;
+                }
+                
+                notificationResult.classList.remove('hidden');
+                
+                // Hide result after 5 seconds
+                setTimeout(() => {
+                    notificationResult.classList.add('hidden');
+                }, 5000);
+            })
+            .catch(error => {
+                console.error('Error resetting sync time:', error);
+                notificationResult.className = 'mt-3 p-3 rounded-lg bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
+                notificationResult.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        <span>Error resetting sync time. Please try again.</span>
+                    </div>
+                `;
+                notificationResult.classList.remove('hidden');
+            });
+        }
+    });
+    
+    // Function to show notification
+    function showNotification(count) {
+        // Create notification banner if it doesn't exist
+        let notificationBanner = document.getElementById('notification-banner');
+        
+        if (!notificationBanner) {
+            notificationBanner = document.createElement('div');
+            notificationBanner.id = 'notification-banner';
+            notificationBanner.className = 'fixed top-0 left-0 right-0 z-50 bg-gray-800 text-white transform -translate-y-full transition-transform duration-300';
+            notificationBanner.innerHTML = `
+                <div class="flex items-center justify-between px-4 py-3">
+                    <div class="flex items-center">
+                        <i class="fas fa-envelope mr-2"></i>
+                        <span id="notification-text">You have new email(s)</span>
+                    </div>
+                    <button id="notification-close" class="text-white hover:text-gray-300">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(notificationBanner);
+            
+            // Add close button functionality
+            document.getElementById('notification-close').addEventListener('click', function() {
+                notificationBanner.style.transform = 'translateY(-100%)';
+            });
+        }
+        
+        // Update notification text
+        document.getElementById('notification-text').textContent = `You have ${count} new email${count > 1 ? 's' : ''}`;
+        
+        // Show notification
+        notificationBanner.style.transform = 'translateY(0)';
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            notificationBanner.style.transform = 'translateY(-100%)';
+        }, 5000);
+    }
+    
+    // Theme toggle functionality
+    const themeToggle = document.getElementById('theme');
+    themeToggle.addEventListener('change', function() {
+        const theme = this.value;
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+        } else {
+            // System preference
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+        localStorage.setItem('theme', theme);
+        showToast('Theme updated', 'success');
+    });
+    
+    // Load saved theme preference
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        themeToggle.value = savedTheme;
+        themeToggle.dispatchEvent(new Event('change'));
+    }
+    
+    // Save preferences
+    const savePreferencesBtn = document.getElementById('savePreferencesBtn');
+    savePreferencesBtn.addEventListener('click', function() {
+        const theme = document.getElementById('theme').value;
+        const language = document.getElementById('language').value;
+        const timezone = document.getElementById('timezone').value;
+        
+        fetch('/api/update-preferences', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                theme: theme,
+                language: language,
+                timezone: timezone
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Preferences saved successfully', 'success');
+            } else {
+                showToast('Error saving preferences', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error saving preferences:', error);
+            showToast('Error saving preferences', 'error');
+        });
+    });
+});
+</script>
+{% endblock %}
